@@ -660,6 +660,7 @@ def main():
 
     # uninstall
     p_uninst = subparsers.add_parser("uninstall", help="Desinstalar VisageSoul del sistema")
+    p_uninst.add_argument("-y", "--yes", action="store_true", help="Confirmar desinstalación sin preguntar")
     p_uninst.add_argument("--purge", action="store_true", help="Eliminar también los perfiles faciales")
     p_uninst.set_defaults(func=cmd_uninstall)
 

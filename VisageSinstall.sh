@@ -44,7 +44,12 @@ chmod 666 /etc/visagesoul/config.ini 2>/dev/null || true
 chmod 1777 /etc/visagesoul/faces
 chmod 666 /etc/visagesoul/faces/*.json 2>/dev/null || true
 
-echo -e "\n${BLUE}2. Comprobando instalación con VisageSoul Doctor...${NC}"
+echo -e "\n${BLUE}2. Actualizando caché de iconos y lanzadores del sistema...${NC}"
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+update-desktop-database /usr/share/applications 2>/dev/null || true
+kbuildsycoca6 2>/dev/null || true
+
+echo -e "\n${BLUE}3. Comprobando instalación con VisageSoul Doctor...${NC}"
 /usr/local/bin/visagesoul doctor || true
 
 echo -e "\n${GREEN}=======================================================${NC}"
