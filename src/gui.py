@@ -810,18 +810,6 @@ class MainWindow(QMainWindow):
         self.chk_low_light.setChecked(config.getboolean("camera", "low_light_boost", True))
         c_form.addRow("Mejora de Imagen:", self.chk_low_light)
 
-        self.chk_screen_flash = QCheckBox(tr("chk_screen_flash"))
-        self.chk_screen_flash.setChecked(config.getboolean("camera", "screen_flash", True))
-        self.chk_screen_flash.setToolTip(tr("chk_screen_flash_tooltip"))
-        c_form.addRow("Iluminación Facial:", self.chk_screen_flash)
-
-        self.spin_flash_boost = QSpinBox()
-        self.spin_flash_boost.setRange(10, 50)
-        self.spin_flash_boost.setSingleStep(5)
-        self.spin_flash_boost.setSuffix(" %")
-        self.spin_flash_boost.setValue(config.getint("camera", "screen_flash_boost", 20))
-        c_form.addRow(tr("screen_flash_boost_label"), self.spin_flash_boost)
-
         layout.addWidget(cam_group)
 
         # Audio & Language
@@ -894,8 +882,6 @@ class MainWindow(QMainWindow):
         config.set("security", "sound_feedback", "true" if self.chk_sound.isChecked() else "false")
         config.set("security", "sound_volume", self.slider_volume.value())
         config.set("camera", "low_light_boost", "true" if self.chk_low_light.isChecked() else "false")
-        config.set("camera", "screen_flash", "true" if self.chk_screen_flash.isChecked() else "false")
-        config.set("camera", "screen_flash_boost", self.spin_flash_boost.value())
         config.set("general", "language", self.combo_lang.currentData() or "auto")
         config.save()
         self.refresh_dashboard_status()
