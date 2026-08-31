@@ -178,31 +178,23 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
             primary_face = engine.get_primary_face(faces, min_size=config.getint("security", "min_face_size", 60))
 
             if primary_face is not None:
-                face_history.append(primary_face)
-                if len(face_history) > 8:
-                    face_history.pop(0)
-
                 target_emb = engine.extract_embedding(process_frame, primary_face)
                 is_match, score = engine.verify_against_profile(target_emb, user_embeddings, threshold=threshold)
                 logger.debug(f"Frame score: {score:.3f} (Match: {is_match})")
 
-                # Anti-spoofing liveness check (reject flat static 2D photos / phone screens)
+                # Anti-spoofing FAS multi-layer check (Screens, Photos, Replays)
                 liveness_passed = True
                 if liveness_check:
-                    if len(face_history) < 4:
-                        liveness_passed = False
-                    else:
-                        liveness_score = engine.compute_liveness_score(face_history)
-                        if liveness_score < 0.0012:
-                            liveness_passed = False
-                            logger.debug(f"Static photo suspected: 3D parallax variance too low ({liveness_score:.7f} < 0.0012)")
+                    liveness_passed, liveness_score, liveness_msg = engine.check_liveness(frame, primary_face)
+                    if not liveness_passed:
+                        logger.debug(f"Liveness rejected: {liveness_msg} (score: {liveness_score:.5f})")
 
                 if is_match and liveness_passed:
                     if require_gesture and gesture_engine:
                         gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
                         logger.debug(f"Face matched + Liveness OK. Gesture ({gesture_type}) detected: {gesture_ok} ({g_name})")
                         if gesture_ok:
-                            logger.info(f"Verification successful for {username} (Face + Liveness + {g_name})! (Score: {score:.3f})")
+                            logger.info(f"Verification successful for {username} (Face + 3D Live + {g_name})! (Score: {score:.3f})")
                             reset_attempts(username)
                             if sound_feedback:
                                 play_chime("success")
