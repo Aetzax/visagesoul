@@ -90,11 +90,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "uninst_confirm_title": "Confirmar Desinstalación",
         "uninst_confirm_msg": "¿Estás seguro de que deseas desinstalar VisageSoul de tu sistema?\n\nLas reglas PAM de SDDM y KDE volverán al estado predeterminado de contraseña.",
         "uninst_success": "VisageSoul ha sido desinstalado correctamente de tu sistema.\n\nLa aplicación se cerrará ahora.",
-        "about_group": "Acerca de VisageSoul y Créditos",
+        "about_group": "Acerca de VisageSoul",
         "about_desc": "Autenticación biométrica facial y gestual de nueva generación para Linux.",
-        "credits_title": "Créditos y Agradecimientos",
+        "credits_title": "Créditos:",
         "btn_open_repo": "🌐 Repositorio Oficial en GitHub (Aetzax/visagesoul)",
-        "btn_donate": "💖 Apoyar el Proyecto / Donar (PayPal)",
+        "btn_donate": "Donar / Apoyar (PayPal)",
     },
     "en": {
         # App & Header
@@ -177,11 +177,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "uninst_confirm_title": "Confirm Uninstallation",
         "uninst_confirm_msg": "Are you sure you want to uninstall VisageSoul from your system?\n\nPAM authentication rules will be restored to default password state.",
         "uninst_success": "VisageSoul has been uninstalled successfully.\n\nThe application will now close.",
-        "about_group": "About VisageSoul & Credits",
+        "about_group": "About VisageSoul",
         "about_desc": "Next-gen biometric facial and gestural authentication for Linux.",
-        "credits_title": "Credits & Acknowledgments",
+        "credits_title": "Credits:",
         "btn_open_repo": "🌐 Official GitHub Repository (Aetzax/visagesoul)",
-        "btn_donate": "💖 Support the Project / Donate (PayPal)",
+        "btn_donate": "Donate / Support (PayPal)",
     }
 }
 

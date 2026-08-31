@@ -647,7 +647,7 @@ def print_custom_help():
    \_/ |_|___/\__,_|\__, |\___| |____/ \___/ \__,_|_|
                     |___/                            \033[0m
  \033[1;36m✨ VisageSoul v1.0.0 (Build 2026.08.31) — Biometría Facial & Gestual para Linux\033[0m
- \033[1;30m🌐 GitHub:\033[0m \033[4;34mhttps://github.com/Aetzax/visagesoul\033[0m  |  \033[1;35m💖 Donaciones:\033[0m \033[4;35mhttps://paypal.me/aetzax1\033[0m
+ \033[1;30m🌐 GitHub:\033[0m \033[4;34mhttps://github.com/Aetzax/visagesoul\033[0m  |  \033[1;35mDonaciones:\033[0m \033[4;35mhttps://paypal.me/aetzax1\033[0m
 
 \033[1;33mUso:\033[0m \033[1mvisagesoul <comando> [opciones]\033[0m
 

@@ -164,7 +164,7 @@ sudo ./VisageSuninstall.sh
 
 If you find VisageSoul useful and want to support ongoing development, consider buying a coffee or contributing:
 
-- 💖 **PayPal:** [paypal.me/aetzax1](https://paypal.me/aetzax1)
+- **PayPal:** [paypal.me/aetzax1](https://paypal.me/aetzax1)
 
 ## License
 
