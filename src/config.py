@@ -48,7 +48,7 @@ DEFAULT_CONFIG = {
     "pam": {
         "debug": "false",
         "notify": "true",
-        "message": "Iniciando sesión con VisageSoul...",
+        "message": "Esperando biometría...",
     },
 }
 

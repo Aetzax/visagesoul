@@ -93,7 +93,12 @@ static const char *get_verify_binary_path() {
 
 static void get_config_pam_settings(const char *username, int *out_notify, char *out_message, size_t max_len) {
     *out_notify = 1;
-    strncpy(out_message, "Iniciando sesión con VisageSoul...", max_len - 1);
+    const char *lang_env = getenv("LANG");
+    if (lang_env && strncmp(lang_env, "en", 2) == 0) {
+        strncpy(out_message, "Waiting for biometrics...", max_len - 1);
+    } else {
+        strncpy(out_message, "Esperando biometría...", max_len - 1);
+    }
     out_message[max_len - 1] = '\0';
 
     char user_config_path[512] = "";

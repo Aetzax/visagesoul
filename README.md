@@ -140,7 +140,7 @@ attempts_window = 300
 
 [pam]
 notify = true
-message = Authenticating with VisageSoul...
+message = Waiting for biometrics...
 ```
 
 ## Architecture & Security

@@ -67,6 +67,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "lock_msg_group": "Mensajes en Pantalla de Bloqueo",
         "chk_pam_notify": "Mostrar mensaje informativo en pantalla de bloqueo",
         "pam_message_label": "Texto del mensaje:",
+        "default_pam_message": "Esperando biometría...",
         "btn_save_security": "💾 Guardar y Aplicar Ajustes de Seguridad",
         "security_saved": "Configuración de seguridad y reglas PAM aplicadas exitosamente.",
 
@@ -148,6 +149,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "lock_msg_group": "Lock Screen Message",
         "chk_pam_notify": "Show status message on lock screen",
         "pam_message_label": "Message text:",
+        "default_pam_message": "Waiting for biometrics...",
         "btn_save_security": "💾 Save & Apply Security Rules",
         "security_saved": "Security configuration and PAM rules applied successfully.",
 

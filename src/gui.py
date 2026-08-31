@@ -716,7 +716,10 @@ class MainWindow(QMainWindow):
         m_form.addRow("Mensaje Activo:", self.chk_pam_notify)
 
         self.edit_pam_msg = QLineEdit()
-        self.edit_pam_msg.setText(config.get("pam", "message", "Iniciando sesión con VisageSoul..."))
+        cur_msg = config.get("pam", "message", "")
+        if not cur_msg or cur_msg == "Iniciando sesión con VisageSoul...":
+            cur_msg = tr("default_pam_message")
+        self.edit_pam_msg.setText(cur_msg)
         m_form.addRow(tr("pam_message_label"), self.edit_pam_msg)
 
         layout.addWidget(msg_group)
@@ -744,7 +747,7 @@ class MainWindow(QMainWindow):
         config.set("security", "auto_unlock", "true" if self.chk_auto_unlock.isChecked() else "false")
         config.set("security", "max_attempts", self.spin_max_attempts.value())
         config.set("pam", "notify", "true" if self.chk_pam_notify.isChecked() else "false")
-        config.set("pam", "message", self.edit_pam_msg.text().strip() or "Iniciando sesión con VisageSoul...")
+        config.set("pam", "message", self.edit_pam_msg.text().strip() or tr("default_pam_message"))
         config.save()
 
         # 2. Apply PAM service changes
