@@ -1,94 +1,163 @@
-# ✨ VisageSoul: Next-Gen Biometric Facial & Gestural Authentication for Linux
+<p align="center">
+  <img src="assets/visagesoul.svg" width="120" height="120" alt="VisageSoul logo">
+</p>
+
+<h1 align="center">VisageSoul</h1>
 
 <p align="center">
-  <img src="assets/visagesoul.svg" width="140" height="140" alt="VisageSoul Logo">
+  Facial and gesture-based biometric authentication for Linux systems.
 </p>
 
 <p align="center">
-  <b>Biometría Facial y Gestual de Última Generación para Linux</b><br>
-  <i>Integración fluida para SDDM, KDE Plasma (kscreenlocker), sudo y Polkit.</i>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Language-Python%20%7C%20C-blue.svg" alt="Languages">
-  <img src="https://img.shields.io/badge/Desktop-KDE%20Plasma%20%7C%20Wayland-blueviolet.svg" alt="Desktop">
-  <img src="https://img.shields.io/badge/Hardware-Logitech%20StreamCam%20%7C%20V4L2-success.svg" alt="Camera">
-  <img src="https://img.shields.io/badge/License-GPL3-green.svg" alt="License">
+  <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/C-PAM%20Module-00599C.svg" alt="C PAM">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-yellow.svg" alt="Python">
 </p>
 
 ---
 
-## 🌟 Características Principales (Key Features)
+VisageSoul is a lightweight, local biometric authentication system that integrates directly with Linux PAM (Pluggable Authentication Modules). It allows you to unlock your desktop session, log in via display managers, or run `sudo` using your webcam.
 
-- ⚡ **Desbloqueo Instantáneo Automático (Auto-Continue)**: Pasa directamente al escritorio en cuanto te reconoce, eliminando cualquier botón o pausa en la pantalla de bloqueo.
-- 👍 **Doble Factor Gestual (Pulgar Arriba / Thumbs-Up)**: Permite requerir levantar el pulgar ante la cámara como confirmación explícita de desbloqueo, evitando accesos involuntarios.
-- 🎵 **Efectos de Sonido (Audio Chimes)**: Retroalimentación sonora agradable al iniciar sesión con éxito (estilo macOS / Windows Hello).
-- 🌙 **Compensación de Poca Luz (CLAHE)**: Algoritmo de visión artificial adaptativo para reconocer tu rostro en habitaciones oscuras o de noche.
-- 🌐 **Soporte Bilingüe (i18n)**: Interfaz y mensajes disponibles en **Español 🇪🇸** e **Inglés 🇺🇸** con detección automática.
-- 📷 **Optimizado para Logitech StreamCam**: Auto-exposición y warmup de fotogramas calibrados para hardware moderno.
-- 🛡️ **Seguridad Total & Fallback Inmediato**: Si la cámara no te ve o no hay luz, el sistema pasa inmediatamente a pedir tu contraseña tradicional sin bloquearte.
-- 🎨 **Configurador Gráfico Qt6**: Interfaz visual moderna integrada en KDE Plasma con modo oscuro y permisos Polkit / sudo.
-- 🗑️ **Desinstalador Seguro en 1-Click**: Scripts oficiales `VisageSinstall.sh` y `VisageSuninstall.sh` para instalar y desinstalar de forma limpia y segura.
+It uses OpenCV's YuNet for real-time face detection and SFace for 128-dimensional embedding extraction, combined with MediaPipe for optional hand gesture confirmation.
 
----
+## Features
 
-## 🚀 Instalación (Quick Start)
+- **Session Auto-Unlock**: Seamlessly dismisses the lock screen via `systemd-logind` upon successful face match without requiring extra clicks.
+- **Optional Gesture 2FA**: Require a physical thumbs-up gesture alongside face recognition to prevent accidental unlocks. Uses a hybrid geometric landmark classifier for angle and distance tolerance.
+- **Multiple Aspects per Profile**: Register multiple facial conditions per user (e.g., with glasses, without glasses, different lighting conditions).
+- **PAM Integration**: Native support for KDE Screen Locker (`kscreenlocker`), SDDM, GDM, LightDM, `sudo`, and Polkit.
+- **Anti-Spoofing & Liveness**: 3D micro-movement variance analysis across consecutive frames to prevent flat photo spoofing.
+- **Fail-Safe Fallback**: If the camera is busy, disconnected, or recognition times out, PAM immediately falls back to standard password authentication without locking you out.
+- **Lockout Protection**: Configurable limit for failed attempts (default: 3) before temporarily forcing manual password entry.
+- **Low-Light Compensation**: Automatic CLAHE (Contrast Limited Adaptive Histogram Equalization) for dark environments.
+- **Qt6 Control Panel & CLI**: Graphical management dashboard alongside a complete command-line interface.
+- **Bilingual Interface**: Built-in support for English and Spanish with automatic system locale detection.
 
-Ejecuta el instalador oficial desde la carpeta del proyecto:
+## Prerequisites
+
+- Linux system with `systemd` and PAM.
+- Working webcam (V4L2 compatible).
+- Dependencies: `gcc`, `make`, `pam` headers (`pam-devel` or `libpam0g-dev`), `python3` (3.10+), and `python-virtualenv`.
+
+## Installation
+
+Clone the repository and run the installer:
 
 ```bash
-cd "/home/aetzax/Proyectos/linux auth face"
+git clone https://github.com/Aetzax/visagesoul.git
+cd visagesoul
 sudo ./VisageSinstall.sh
 ```
 
----
+The installer will:
+1. Compile the native C PAM module (`pam_visagesoul.so`) into your system security libraries.
+2. Download the required ONNX and MediaPipe neural models.
+3. Set up the Python virtual environment and system binaries in `/opt/visagesoul/`.
+4. Install desktop launchers and icons.
 
-## 🎮 Uso y Configuración
+## Quick Start
 
-### 1. Interfaz Gráfica (GUI)
-Abre el configurador visual en cualquier momento:
+### 1. Register your face
+
+Run the interactive enrollment wizard:
+
+```bash
+# Register base profile
+visagesoul enroll
+
+# Register an additional aspect (e.g. wearing glasses)
+visagesoul enroll --label "Glasses"
+```
+
+You can also use the graphical configurator:
+
 ```bash
 visagesoul gui
 ```
-*(O búscalo como **VisageSoul** en el lanzador de aplicaciones de KDE Plasma).*
 
-### 2. Comandos de Terminal (CLI)
+### 2. Enable PAM Authentication
+
+Enable VisageSoul for your desired services:
 
 ```bash
-# 1. Registrar tu rostro
-visagesoul enroll
-
-# 2. Probar la cámara, reconocimiento facial y gestos en tiempo real
-visagesoul test
-
-# 3. Comprobar el estado general del sistema y servicios PAM
-visagesoul status
-
-# 4. Activar o desactivar en SDDM y la pantalla de bloqueo de KDE
-sudo visagesoul enable sddm
+# Enable for KDE lock screen and SDDM
 sudo visagesoul enable kde
+sudo visagesoul enable sddm
 
-# 5. Ejecutar diagnóstico de dependencias y cámara
-visagesoul doctor
+# Enable for terminal sudo
+sudo visagesoul enable sudo
 
-# 6. Desinstalar VisageSoul del sistema
-sudo ./VisageSuninstall.sh
-# (o sudo visagesoul uninstall)
+# Enable for GUI authorization prompts
+sudo visagesoul enable polkit-1
 ```
 
----
+### 3. Test Recognition
 
-## 🏗️ Arquitectura Técnica
+Test your camera feed, face matching score, and gesture tracking in real time:
 
-- **Módulo PAM (`src/pam_visagesoul.c`)**: Módulo nativo compilado en C (`pam_visagesoul.so`) con aislamiento de procesos `fork()` y fallback a prueba de fallos.
-- **Redes Neuronales de IA**:
-  - **YuNet ONNX**: Detección facial ultrarrápida multiescala (~10ms).
-  - **SFace ONNX**: Extracción de vectores faciales de 128 dimensiones y distancia coseno.
-  - **MediaPipe Gesture Recognizer**: Detección de pose y gesto de pulgar arriba en tiempo real.
-- **Auto-Unlock Daemon**: Integración directa con `systemd-logind` (`loginctl unlock-session`).
+```bash
+visagesoul test
+```
 
----
+## CLI Reference
 
-## 📄 Licencia
+| Command | Description |
+| :--- | :--- |
+| `visagesoul enroll [user] [--label "..."]` | Enroll a new face profile or aspect. |
+| `visagesoul test [user]` | Run real-time camera and gesture diagnostics. |
+| `visagesoul status` | Display system status, camera, and active PAM rules. |
+| `visagesoul list` | List all enrolled users and their registered aspects. |
+| `visagesoul remove <user>` | Delete a user's face profile. |
+| `visagesoul enable <service>` | Enable PAM authentication for a service (`sddm`, `kde`, `sudo`, `polkit-1`, or `all`). |
+| `visagesoul disable <service>` | Disable PAM authentication for a service. |
+| `visagesoul doctor` | Run hardware, library, and permissions diagnostics. |
+| `visagesoul gui` | Open the Qt6 graphical control panel. |
 
-Este proyecto está bajo la licencia **GNU General Public License v3.0 (GPLv3)**.
+## Configuration
+
+Settings are stored in `/etc/visagesoul/config.ini` (system-wide) with per-user overrides supported in `~/.config/visagesoul/config.ini`.
+
+```ini
+[camera]
+device = /dev/video0
+width = 1280
+height = 720
+fourcc = MJPG
+fps = 30
+warmup_frames = 5
+low_light_boost = true
+
+[security]
+threshold = 0.70
+timeout = 4.0
+require_thumbs_up = false
+auto_unlock = true
+sound_feedback = true
+sound_volume = 30
+max_attempts = 3
+attempts_window = 300
+
+[pam]
+notify = true
+message = Authenticating with VisageSoul...
+```
+
+## Architecture & Security
+
+- **Process Isolation**: The PAM module (`src/pam_visagesoul.c`) forks verification into a separate process with strict return code handling (`PAM_SUCCESS`, `PAM_AUTH_ERR`, `PAM_IGNORE`).
+- **Input Sanitization**: Usernames are validated against path traversal patterns before filesystem operations.
+- **Biometric Templates**: Facial embeddings are stored as 128-float cosine vectors. Raw images are discarded immediately after feature extraction.
+- **Runtime State**: Attempt counters and rate-limiting data are stored in isolated runtime directories to prevent symlink attacks.
+
+## Uninstallation
+
+To cleanly remove VisageSoul and restore default PAM configurations:
+
+```bash
+sudo ./VisageSuninstall.sh
+```
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
