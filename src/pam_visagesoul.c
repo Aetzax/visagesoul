@@ -249,19 +249,19 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             if (debug) syslog(LOG_INFO, "User '%s' authenticated successfully via biometric face match.", username);
             return PAM_SUCCESS;
         } else if (exit_code == 3) {
-            /* Max failed attempts exceeded -> force password entry */
-            send_pam_info(pamh, "Límite de intentos faciales superado. Introduce tu contraseña.");
-            return PAM_AUTH_ERR;
+            /* Max failed attempts exceeded -> cleanly fall back to password entry */
+            if (notify) send_pam_info(pamh, "Límite de intentos superado. Introduce tu contraseña.");
+            return PAM_AUTHINFO_UNAVAIL;
         } else if (exit_code == 2) {
             if (debug) syslog(LOG_NOTICE, "Camera unavailable or busy. Falling back.");
             return PAM_IGNORE;
         } else {
-            if (debug) syslog(LOG_NOTICE, "Biometric match failed or timed out for '%s'.", username);
-            return PAM_AUTH_ERR;
+            if (debug) syslog(LOG_NOTICE, "Biometric match failed or timed out for '%s'. Falling back to password.", username);
+            return PAM_AUTHINFO_UNAVAIL;
         }
     }
 
-    return PAM_AUTH_ERR;
+    return PAM_IGNORE;
 }
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
