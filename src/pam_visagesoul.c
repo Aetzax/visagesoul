@@ -162,14 +162,43 @@ static void get_config_pam_settings(const char *username, int *out_notify, char 
     }
 }
 
+static int is_visagesoul_internal_call(void) {
+    const char *bypass_env = getenv("VISAGESOUL_NO_PAM");
+    if (bypass_env && (strcmp(bypass_env, "1") == 0 || strcmp(bypass_env, "true") == 0)) {
+        return 1;
+    }
+
+    /* Check parent and current process command lines to prevent triggering biometrics inside GUI */
+    char path[64];
+    pid_t pids[2] = { getppid(), getpid() };
+    for (int p = 0; p < 2; p++) {
+        snprintf(path, sizeof(path), "/proc/%d/cmdline", pids[p]);
+        FILE *fp = fopen(path, "r");
+        if (fp) {
+            char buf[512];
+            size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+            fclose(fp);
+            if (n > 0) {
+                buf[n] = '\0';
+                for (size_t i = 0; i < n; i++) {
+                    if (buf[i] == '\0') buf[i] = ' ';
+                }
+                if (strstr(buf, "visagesoul") || strstr(buf, "gui.py")) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
     (void)flags;
     const char *username = NULL;
     int debug = 0;
 
-    /* Fast bypass if caller explicitly requested no biometric PAM (e.g. inside VisageSoul GUI) */
-    const char *bypass_env = getenv("VISAGESOUL_NO_PAM");
-    if (bypass_env && (strcmp(bypass_env, "1") == 0 || strcmp(bypass_env, "true") == 0)) {
+    /* Fast bypass: NEVER trigger facial recognition when configuring VisageSoul from the GUI */
+    if (is_visagesoul_internal_call()) {
         return PAM_IGNORE;
     }
 
