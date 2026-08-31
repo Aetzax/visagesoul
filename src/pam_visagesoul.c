@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <syslog.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -211,7 +212,16 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
 
     if (pid == 0) {
-        /* Child process */
+        /* Child process: silence C++ logging to terminal unless debug is explicitly requested */
+        if (!debug) {
+            int devnull = open("/dev/null", O_RDWR);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                close(devnull);
+            }
+        }
+
         char *args[] = {
             (char *)verify_bin,
             "--user",

@@ -10,6 +10,12 @@ Returns:
 
 import sys
 import os
+
+# Suppress internal C++ logging from OpenCV, TensorFlow Lite and MediaPipe
+os.environ["GLOG_minloglevel"] = "3"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
+
 import json
 import time
 import argparse
