@@ -22,8 +22,8 @@ from typing import List, Optional
 import cv2
 import numpy as np
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt6.QtGui import QImage, QPixmap, QIcon, QFont
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QUrl
+from PyQt6.QtGui import QImage, QPixmap, QIcon, QFont, QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QLabel, QPushButton, QProgressBar, QCheckBox,
@@ -866,6 +866,30 @@ class MainWindow(QMainWindow):
         m_layout.addWidget(btn_uninstall)
 
         layout.addWidget(maint_group)
+
+        # About & Credits Box
+        about_group = QGroupBox("ℹ️ " + tr("about_group"))
+        ab_layout = QVBoxLayout(about_group)
+
+        lbl_about_info = QLabel(
+            "<b>VisageSoul v1.0.0 (Build 2026.08.31)</b><br>"
+            "<i>" + tr("about_desc") + "</i><br><br>"
+            "<b>" + tr("credits_title") + ":</b><br>"
+            "• <b>Desarrollador / Author:</b> Aetzax & Open-Source Community<br>"
+            "• <b>IA & Visión:</b> YuNet (Detector Facial), SFace (Embeddings), MediaPipe (Gestos 3D)<br>"
+            "• <b>Licencia:</b> GNU General Public License v3.0 (GPL-3.0)"
+        )
+        lbl_about_info.setTextFormat(Qt.TextFormat.RichText)
+        lbl_about_info.setStyleSheet("color: #a9b1d6; line-height: 1.4;")
+        ab_layout.addWidget(lbl_about_info)
+
+        btn_repo = QPushButton(tr("btn_open_repo"))
+        btn_repo.setObjectName("primaryBtn")
+        btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/Aetzax/visagesoul")))
+        ab_layout.addWidget(btn_repo)
+
+        layout.addWidget(about_group)
 
         # Save Button
         btn_save_pref = QPushButton(tr("btn_save_preferences"))

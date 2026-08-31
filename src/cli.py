@@ -637,8 +637,58 @@ def cmd_gui(args):
         return 1
 
 
+def print_custom_help():
+    """Prints a beautiful, human-readable colorful CLI help menu."""
+    print(r"""
+\033[1;34m  _   _ _                        ____              _ 
+ | | | (_)___  __ _  __ _  ___  / ___|  ___  _   _| |
+ | | | | / __|/ _` |/ _` |/ _ \ \___ \ / _ \| | | | |
+  \ V /| \__ \ (_| | (_| |  __/  ___) | (_) | |_| | |
+   \_/ |_|___/\__,_|\__, |\___| |____/ \___/ \__,_|_|
+                    |___/                            \033[0m
+ \033[1;36m✨ VisageSoul v1.0.0 (Build 2026.08.31) — Biometría Facial & Gestual para Linux\033[0m
+ \033[1;30m🌐 Repositorio oficial:\033[0m \033[4;34mhttps://github.com/Aetzax/visagesoul\033[0m
+
+\033[1;33mUso:\033[0m \033[1mvisagesoul <comando> [opciones]\033[0m
+
+\033[1;32mComandos Principales:\033[0m
+  \033[1;36mgui\033[0m                    Abrir el panel de control gráfico Qt6
+  \033[1;36menroll\033[0m [usuario]       Registrar un nuevo rostro o aspecto facial
+  \033[1;36mtest\033[0m [usuario]         Probar la cámara y gestos en vivo
+  \033[1;36mstatus\033[0m                 Mostrar estado del sistema, cámara y PAM
+  \033[1;36mdoctor\033[0m                 Diagnóstico de librerías, hardware y permisos
+  \033[1;36mlist\033[0m                   Listar perfiles y aspectos biométricos registrados
+  \033[1;36mremove\033[0m <usuario>       Eliminar el perfil biométrico de un usuario
+
+\033[1;32mGestión de Seguridad & PAM:\033[0m
+  \033[1;36menable\033[0m <servicio>      Activar en: \033[1mkde, sddm, sudo, polkit-1, all\033[0m
+  \033[1;36mdisable\033[0m <servicio>     Desactivar en un servicio específico
+  \033[1;36muninstall\033[0m              Desinstalar VisageSoul del sistema limpiamente
+
+\033[1;32mOpciones Globales:\033[0m
+  \033[1;36m-h, --help\033[0m             Mostrar esta ayuda detallada
+  \033[1;36m-v, --version\033[0m          Mostrar versión del sistema
+
+\033[1;33mEjemplos Rápidos:\033[0m
+  visagesoul gui                        \033[1;30m# Abre el configurador visual\033[0m
+  visagesoul enroll aetzax              \033[1;30m# Registra tu rostro\033[0m
+  visagesoul enroll --label "Con gafas" \033[1;30m# Registra un nuevo aspecto\033[0m
+  visagesoul enable all                 \033[1;30m# Activa biometría en todo el sistema\033[0m
+  visagesoul test                       \033[1;30m# Prueba la detección en tiempo real\033[0m
+""")
+
+
 def main():
-    parser = argparse.ArgumentParser(prog="visagesoul", description="VisageSoul Biometric Authentication Management Tool")
+    if len(sys.argv) == 1 or sys.argv[1] in ("-h", "--help", "help"):
+        print_custom_help()
+        sys.exit(0)
+
+    if sys.argv[1] in ("-v", "--version", "version"):
+        print("\033[1;36mVisageSoul v1.0.0 (Build 2026.08.31)\033[0m")
+        print("https://github.com/Aetzax/visagesoul")
+        sys.exit(0)
+
+    parser = argparse.ArgumentParser(prog="visagesoul", description="VisageSoul Biometric Authentication Management Tool", add_help=False)
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")
 
     # enroll
@@ -707,8 +757,7 @@ def main():
 
     args = parser.parse_args()
     if not args.command:
-        cmd_status(args)
-        parser.print_help()
+        print_custom_help()
         sys.exit(0)
 
     exit_code = args.func(args)
