@@ -406,6 +406,46 @@ class AntiSpoofEngine:
         except Exception as e:
             return True, 0.5, str(e)
 
+    def detect_screen_framing(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
+        """
+        Detects physical device screen bezels, phone borders, and glass glare spots framing the face.
+        """
+        try:
+            h_img, w_img, _ = frame_bgr.shape
+            fx, fy, fw, fh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
+            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+
+            edges = cv2.Canny(gray, 35, 120)
+            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=35, minLineLength=max(30, int(fh * 0.5)), maxLineGap=15)
+
+            bezel_left = 0
+            bezel_right = 0
+            bezel_total = 0
+
+            if lines is not None:
+                for l in lines:
+                    x1, y1, x2, y2 = l.flatten()
+                    if abs(x1 - x2) <= 10 and abs(y1 - y2) >= int(fh * 0.45):
+                        avg_x = (x1 + x2) / 2.0
+                        min_y, max_y = min(y1, y2), max(y1, y2)
+                        if min_y <= fy + fh * 1.5 and max_y >= fy - fh * 0.5:
+                            bezel_total += 1
+                            if avg_x < fx + fw * 0.2:
+                                bezel_left += 1
+                            elif avg_x > fx + fw * 0.8:
+                                bezel_right += 1
+
+            thresh_white = (gray >= 250).astype(np.uint8) * 255
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_white)
+            glare_spots = sum(1 for i in range(1, num_labels) if 8 <= stats[i, cv2.CC_STAT_AREA] <= 800)
+
+            if bezel_total >= 3 or (bezel_left >= 1 and bezel_right >= 1) or (glare_spots >= 1 and bezel_total >= 1):
+                return False, float(bezel_total), "Pantalla/móvil detectado (Bordes de pantalla)"
+
+            return True, 0.0, "Sin bordes de pantalla"
+        except Exception as e:
+            return True, 0.0, str(e)
+
     def analyze_frame(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
         Comprehensive multi-frame liveness verification.
@@ -413,6 +453,11 @@ class AntiSpoofEngine:
         """
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
+
+        # 1. Device Bezel / Screen Framing Check
+        bezel_ok, b_score, b_msg = self.detect_screen_framing(frame_bgr, primary_face)
+        if not bezel_ok:
+            return False, b_score, b_msg
 
         h_img, w_img, _ = frame_bgr.shape
         bx, by, bw, bh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
@@ -423,7 +468,7 @@ class AntiSpoofEngine:
 
         crop = frame_bgr[by:by+bh, bx:bx+bw]
 
-        # 1. Texture & Screen check
+        # 2. Texture & Screen check
         tex_ok, tex_score, tex_msg = self.analyze_texture(crop)
         if not tex_ok:
             return False, tex_score, tex_msg
