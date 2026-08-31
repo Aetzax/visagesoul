@@ -190,7 +190,8 @@ def cmd_test(args):
 
     device_path = config.get("camera", "device", "/dev/video0")
     threshold = config.getfloat("security", "threshold", 0.70)
-    require_thumbs_up = config.getboolean("security", "require_thumbs_up", False)
+    require_gesture = config.getboolean("security", "require_gesture", config.getboolean("security", "require_thumbs_up", False))
+    gesture_mode = config.get("security", "gesture_type", "thumb_up").lower()
     cap = open_camera(device_path)
     if not cap:
         print(f"\033[1;31mError:\033[0m No se pudo abrir {device_path}.")
@@ -214,8 +215,8 @@ def cmd_test(args):
 
         faces = engine.detect_faces(raw_frame)
         primary_face = engine.get_primary_face(faces)
-        gesture_name, gesture_score, is_geom = gesture_engine.detect_gesture(raw_frame)
-        thumb_detected = (gesture_name == "Thumb_Up") or is_geom
+        gesture_name, gesture_score, is_geom_thumb, is_geom_palm = gesture_engine.detect_gesture(raw_frame)
+        gesture_valid, valid_gesture_name = gesture_engine.is_gesture_valid(raw_frame, mode=gesture_mode)
 
         cv2.rectangle(display_frame, (0, 0), (w, 55), (20, 20, 20), -1)
 
@@ -232,13 +233,14 @@ def cmd_test(args):
                 pct = int(score * 100)
 
                 if is_match:
-                    if require_thumbs_up:
-                        if thumb_detected:
+                    if require_gesture:
+                        if gesture_valid:
                             box_color = (0, 255, 0)
-                            score_text = f"AUTORIZADO: {username} ({pct}%) + Pulgar Arriba Detectado!"
+                            score_text = f"AUTORIZADO: {username} ({pct}%) + {valid_gesture_name}"
                         else:
                             box_color = (0, 200, 255)
-                            score_text = f"Rostro OK ({pct}%) -> Levanta el pulgar para desbloquear"
+                            hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta (🖐️)" if gesture_mode == "open_palm" else "Pulgar arriba (👍)")
+                            score_text = f"Rostro OK ({pct}%) -> Muestra {hint}"
                     else:
                         box_color = (0, 255, 0)
                         score_text = f"AUTORIZADO: {username} ({pct}% similitud)"
@@ -267,16 +269,23 @@ def cmd_test(args):
                 2,
             )
 
-        if thumb_detected or (gesture_name and gesture_name != "None"):
-            display_gesture = "Thumb_Up (Pulgar Arriba 👍)" if thumb_detected else gesture_name
+        detected_label = None
+        if gesture_name == "Thumb_Up" or is_geom_thumb:
+            detected_label = "Pulgar Arriba (👍)"
+        elif gesture_name == "Open_Palm" or is_geom_palm:
+            detected_label = "Mano Abierta (🖐️)"
+        elif gesture_name and gesture_name != "None":
+            detected_label = gesture_name
+
+        if detected_label:
             cv2.rectangle(display_frame, (0, h - 40), (w, h), (20, 20, 20), -1)
             cv2.putText(
                 display_frame,
-                f"Gesto detectado: {display_gesture}",
+                f"Gesto detectado: {detected_label}",
                 (20, h - 12),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (0, 255, 128) if thumb_detected else (200, 200, 200),
+                (0, 255, 128) if gesture_valid else (200, 200, 200),
                 2,
             )
 

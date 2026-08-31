@@ -34,6 +34,7 @@ DEFAULT_CONFIG = {
         "min_face_size": "60",
         "liveness_check": "true",
         "require_thumbs_up": "false",
+        "gesture_type": "thumb_up",
         "auto_unlock": "true",
         "sound_feedback": "true",
         "sound_volume": "35",

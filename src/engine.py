@@ -357,13 +357,13 @@ class GestureEngine:
             except Exception as e:
                 logger.warning(f"Could not initialize MediaPipe GestureRecognizer: {e}")
 
-    def detect_gesture(self, frame_bgr: np.ndarray) -> Tuple[Optional[str], float, bool]:
+    def detect_gesture(self, frame_bgr: np.ndarray) -> Tuple[Optional[str], float, bool, bool]:
         """
         Detects hand gesture in a BGR frame.
-        Returns (gesture_category, confidence_score, is_geometric_thumb_up).
+        Returns (gesture_category, confidence_score, is_geometric_thumb_up, is_geometric_open_palm).
         """
         if self.recognizer is None:
-            return None, 0.0, False
+            return None, 0.0, False, False
 
         try:
             import mediapipe as mp
@@ -374,6 +374,7 @@ class GestureEngine:
             top_gesture_name = None
             top_gesture_score = 0.0
             is_geom_thumb = False
+            is_geom_palm = False
 
             if result.gestures and len(result.gestures) > 0:
                 top_gesture = result.gestures[0][0]
@@ -407,22 +408,54 @@ class GestureEngine:
 
                         if folded_count >= 3 and thumb_extended and thumb_above_mcp:
                             is_geom_thumb = True
+
+                        # Open Palm geometric check: at least 4 fingers extended away from wrist and MCP
+                        index_ext = dist_sq(index_tip, wrist) > dist_sq(index_pip, wrist) * 1.1 and dist_sq(index_tip, wrist) > dist_sq(index_mcp, wrist) * 1.2
+                        middle_ext = dist_sq(middle_tip, wrist) > dist_sq(middle_pip, wrist) * 1.1 and dist_sq(middle_tip, wrist) > dist_sq(middle_mcp, wrist) * 1.2
+                        ring_ext = dist_sq(ring_tip, wrist) > dist_sq(ring_pip, wrist) * 1.1 and dist_sq(ring_tip, wrist) > dist_sq(ring_mcp, wrist) * 1.2
+                        pinky_ext = dist_sq(pinky_tip, wrist) > dist_sq(pinky_pip, wrist) * 1.1 and dist_sq(pinky_tip, wrist) > dist_sq(pinky_mcp, wrist) * 1.2
+
+                        extended_count = sum([index_ext, middle_ext, ring_ext, pinky_ext])
+                        if extended_count >= 4 and thumb_extended:
+                            is_geom_palm = True
+
+                        if is_geom_thumb or is_geom_palm:
                             break
 
-            return top_gesture_name, top_gesture_score, is_geom_thumb
+            return top_gesture_name, top_gesture_score, is_geom_thumb, is_geom_palm
         except Exception as e:
             logger.debug(f"Gesture error: {e}")
 
-        return None, 0.0, False
+        return None, 0.0, False, False
 
     def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
+        """Returns True if a Thumb_Up gesture is detected."""
+        gesture, score, is_geom_thumb, _ = self.detect_gesture(frame_bgr)
+        return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
+
+    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
+        """Returns True if an Open_Palm (🖐️) gesture is detected."""
+        gesture, score, _, is_geom_palm = self.detect_gesture(frame_bgr)
+        return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
+
+    def is_gesture_valid(self, frame_bgr: np.ndarray, mode: str = "thumb_up", min_score: float = 0.35) -> Tuple[bool, Optional[str]]:
         """
-        Returns True if a Thumb_Up gesture is detected via AI classification OR geometric landmarks.
-        Resistant to hand tilt, rotation, and camera distance.
+        Validates gesture against requested mode: 'thumb_up', 'open_palm', or 'both'/'any'.
+        Returns (is_valid, detected_gesture_name).
         """
-        gesture, score, is_geom = self.detect_gesture(frame_bgr)
-        if gesture == "Thumb_Up" and score >= min_score:
-            return True
-        if is_geom:
-            return True
-        return False
+        gesture, score, is_geom_thumb, is_geom_palm = self.detect_gesture(frame_bgr)
+        thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
+        palm_ok = (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
+
+        mode_clean = str(mode).lower().strip()
+        if mode_clean in ("thumb_up", "thumbs_up", "pulgar", "pulgar_arriba"):
+            return thumb_ok, ("Pulgar Arriba (👍)" if thumb_ok else None)
+        elif mode_clean in ("open_palm", "palm", "mano_abierta", "mano"):
+            return palm_ok, ("Mano Abierta (🖐️)" if palm_ok else None)
+        elif mode_clean in ("both", "any", "all", "ambos"):
+            if thumb_ok:
+                return True, "Pulgar Arriba (👍)"
+            if palm_ok:
+                return True, "Mano Abierta (🖐️)"
+            return False, None
+        return thumb_ok, ("Pulgar Arriba (👍)" if thumb_ok else None)

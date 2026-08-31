@@ -93,7 +93,7 @@ def reset_attempts(username: str):
             pass
 
 
-def verify_user(username: str, timeout: float = None, threshold: float = None, device_path: str = None, debug: bool = False, require_thumbs_up: bool = None) -> int:
+def verify_user(username: str, timeout: float = None, threshold: float = None, device_path: str = None, debug: bool = False, require_thumbs_up: bool = None, gesture_type: str = None) -> int:
     logger = setup_logger("visagesoul-verify", debug=debug, log_file=config.get("paths", "log_file"))
 
     if timeout is None:
@@ -103,7 +103,12 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     if device_path is None:
         device_path = config.get("camera", "device", "/dev/video0")
     if require_thumbs_up is None:
-        require_thumbs_up = config.getboolean("security", "require_thumbs_up", False)
+        require_gesture = config.getboolean("security", "require_gesture", config.getboolean("security", "require_thumbs_up", False))
+    else:
+        require_gesture = require_thumbs_up
+
+    if gesture_type is None:
+        gesture_type = config.get("security", "gesture_type", "thumb_up").lower()
 
     max_attempts = config.getint("security", "max_attempts", 3)
     attempts_window = config.getint("security", "attempts_window", 300)
@@ -111,7 +116,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     low_light_boost = config.getboolean("camera", "low_light_boost", True)
     sound_feedback = config.getboolean("security", "sound_feedback", True)
 
-    logger.debug(f"Starting VisageSoul verification: user={username}, timeout={timeout}s, threshold={threshold}, thumbs_up={require_thumbs_up}, max_attempts={max_attempts}")
+    logger.debug(f"Starting VisageSoul verification: user={username}, timeout={timeout}s, threshold={threshold}, gesture={require_gesture} ({gesture_type}), max_attempts={max_attempts}")
 
     # Check attempt limit
     if not check_attempt_limit(username, max_attempts=max_attempts, window_seconds=attempts_window):
@@ -121,7 +126,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     # 1. Initialize FaceEngine and check if profile exists
     try:
         engine = FaceEngine()
-        gesture_engine = GestureEngine() if require_thumbs_up else None
+        gesture_engine = GestureEngine() if require_gesture else None
     except Exception as e:
         logger.error(f"Failed to initialize FaceEngine: {e}")
         return 2
@@ -183,18 +188,18 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
                 # Anti-spoofing liveness check (reject flat static 2D photos)
                 liveness_passed = True
-                if liveness_check and len(face_history) >= 3 and not require_thumbs_up:
+                if liveness_check and len(face_history) >= 3 and not require_gesture:
                     liveness_score = engine.compute_liveness_score(face_history)
                     if liveness_score < 0.00003:
                         liveness_passed = False
                         logger.debug(f"Static photo suspected: liveness variance too low ({liveness_score:.7f})")
 
                 if is_match and liveness_passed:
-                    if require_thumbs_up and gesture_engine:
-                        thumb_ok = gesture_engine.is_thumb_up(frame)
-                        logger.debug(f"Face matched. Thumbs Up detected: {thumb_ok}")
-                        if thumb_ok:
-                            logger.info(f"Verification successful for {username} (Face + Thumbs Up)! (Score: {score:.3f})")
+                    if require_gesture and gesture_engine:
+                        gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
+                        logger.debug(f"Face matched. Gesture ({gesture_type}) detected: {gesture_ok} ({g_name})")
+                        if gesture_ok:
+                            logger.info(f"Verification successful for {username} (Face + {g_name})! (Score: {score:.3f})")
                             reset_attempts(username)
                             if sound_feedback:
                                 play_chime("success")
