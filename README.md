@@ -145,8 +145,10 @@ message = Authenticating with VisageSoul...
 
 ## Architecture & Security
 
-- **Process Isolation**: The PAM module (`src/pam_visagesoul.c`) forks verification into a separate process with strict return code handling (`PAM_SUCCESS`, `PAM_AUTH_ERR`, `PAM_IGNORE`).
-- **Input Sanitization**: Usernames are validated against path traversal patterns before filesystem operations.
+- **Process Isolation**: The PAM module (`src/pam_visagesoul.c`) forks verification into a separate process with strict return code handling (`PAM_SUCCESS`, `PAM_AUTHINFO_UNAVAIL`, `PAM_IGNORE`).
+- **Administrative Recursion Bypass**: Internal configuration commands (such as `visagesoul enable`, `visagesoul disable`, `visagesoul remove`, and the Qt GUI) automatically inspect the caller process tree (`/proc/$PPID/cmdline`). Administrative management tasks bypass the camera (`PAM_IGNORE`) and require standard password verification, preventing hardware resource locks and redundant scans.
+- **Fail-Safe Password Fallback**: When recognition times out or biometric matching fails, the module immediately returns `PAM_AUTHINFO_UNAVAIL`, allowing Linux PAM to fall back cleanly to standard password entry without authentication deadlocks.
+- **Input Sanitization**: Usernames are validated against path traversal and shell injection patterns before any filesystem operations.
 - **Biometric Templates**: Facial embeddings are stored as 128-float cosine vectors. Raw images are discarded immediately after feature extraction.
 - **Runtime State**: Attempt counters and rate-limiting data are stored in isolated runtime directories to prevent symlink attacks.
 
