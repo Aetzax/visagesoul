@@ -5,21 +5,23 @@
 <h1 align="center">VisageSoul</h1>
 
 <p align="center">
-  Facial and gesture-based biometric authentication for Linux systems.
+  <strong>Fast, secure Windows Hello alternative for Linux with facial and gesture-based biometric authentication.</strong><br>
+  <em>Unlock your desktop, authenticate sudo, and log in with your webcam in 0.3s.</em>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License">
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/Windows%20Hello-Linux%20Alternative-blueviolet.svg" alt="Windows Hello Alternative">
   <img src="https://img.shields.io/badge/C-PAM%20Module-00599C.svg" alt="C PAM">
   <img src="https://img.shields.io/badge/Python-3.10%2B-yellow.svg" alt="Python">
 </p>
 
 ---
 
-VisageSoul is a lightweight, local biometric authentication system that integrates directly with Linux PAM (Pluggable Authentication Modules). It allows you to unlock your desktop session, log in via display managers, or run `sudo` using your webcam.
+**VisageSoul** is a modern, high-performance **Windows Hello alternative for Linux** that integrates seamlessly with Linux PAM (Pluggable Authentication Modules). It provides ultra-fast biometric face unlock (~0.3s) for your desktop lock screen, Display Managers (SDDM, GDM, LightDM), Polkit authorization windows, and terminal `sudo` commands using standard RGB webcams or IR cameras.
 
-It uses OpenCV's YuNet for real-time face detection and SFace for 128-dimensional embedding extraction, combined with MediaPipe for optional hand gesture confirmation.
+Powered by state-of-the-art neural vision models (**YuNet** for microsecond face detection and **SFace** for 128D cosine embeddings), paired with **MediaPipe 3D** for optional gesture 2FA confirmation (👍) and **CLAHE** low-light compensation.
 
 ## Features
 
