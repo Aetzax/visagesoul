@@ -142,6 +142,8 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
         logger.error(f"Unable to access camera {device_path}.")
         return 2
 
+    liveness_check = config.getboolean("security", "liveness_check", True)
+
     try:
         # Sensor warmup
         warmup_camera(cap, warmup_frames)
@@ -149,6 +151,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
         start_time = time.time()
         consecutive_matches = 0
         REQUIRED_CONSECUTIVE_MATCHES = 2
+        face_history = []
 
         while (time.time() - start_time) < timeout:
             ret, frame = cap.read()
@@ -164,11 +167,23 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
             primary_face = engine.get_primary_face(faces, min_size=config.getint("security", "min_face_size", 60))
 
             if primary_face is not None:
+                face_history.append(primary_face)
+                if len(face_history) > 6:
+                    face_history.pop(0)
+
                 target_emb = engine.extract_embedding(process_frame, primary_face)
                 is_match, score = engine.verify_against_profile(target_emb, user_embeddings, threshold=threshold)
                 logger.debug(f"Frame score: {score:.3f} (Match: {is_match})")
 
-                if is_match:
+                # Anti-spoofing liveness check (reject flat static 2D photos)
+                liveness_passed = True
+                if liveness_check and len(face_history) >= 3 and not require_thumbs_up:
+                    liveness_score = engine.compute_liveness_score(face_history)
+                    if liveness_score < 0.00003:
+                        liveness_passed = False
+                        logger.debug(f"Static photo suspected: liveness variance too low ({liveness_score:.7f})")
+
+                if is_match and liveness_passed:
                     if require_thumbs_up and gesture_engine:
                         thumb_ok = gesture_engine.is_thumb_up(frame)
                         logger.debug(f"Face matched. Thumbs Up detected: {thumb_ok}")
