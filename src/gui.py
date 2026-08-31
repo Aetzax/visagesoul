@@ -292,10 +292,14 @@ class MainWindow(QMainWindow):
             self.camera_worker.stop()
             time.sleep(0.15)
 
+        # Set bypass environment so PAM never uses biometrics inside the GUI
+        exec_env = os.environ.copy()
+        exec_env["VISAGESOUL_NO_PAM"] = "1"
+
         try:
             if os.geteuid() == 0:
                 cli_bin = str(Path(__file__).resolve().parent / "cli.py")
-                res = subprocess.run([sys.executable, cli_bin] + args, capture_output=True, text=True)
+                res = subprocess.run([sys.executable, cli_bin] + args, capture_output=True, text=True, env=exec_env)
                 return (res.returncode == 0, res.stdout or res.stderr)
 
             cli_bin = "/usr/local/bin/visagesoul"
@@ -307,14 +311,14 @@ class MainWindow(QMainWindow):
 
             # 1. Try pkexec (Polkit KDE GUI dialog)
             try:
-                pk_cmd = ["pkexec"] + cmd_base + args
-                res = subprocess.run(pk_cmd, capture_output=True, text=True)
+                pk_cmd = ["pkexec", "env", "VISAGESOUL_NO_PAM=1"] + cmd_base + args
+                res = subprocess.run(pk_cmd, capture_output=True, text=True, env=exec_env)
                 if res.returncode == 0:
                     return True, res.stdout
             except Exception:
                 pass
 
-            # 2. Fallback: Prompt user with Qt Password Dialog
+            # 2. Prompt user with Qt Password Dialog
             password, ok = QInputDialog.getText(
                 self,
                 prompt_title,
@@ -324,13 +328,14 @@ class MainWindow(QMainWindow):
             if not ok or not password:
                 return False, "Operación cancelada por el usuario."
 
-            sudo_cmd = ["sudo", "-S", "-p", ""] + cmd_base + args
+            sudo_cmd = ["sudo", "--preserve-env=VISAGESOUL_NO_PAM", "-S", "-p", ""] + cmd_base + args
             try:
                 proc = subprocess.run(
                     sudo_cmd,
                     input=f"{password}\n",
                     capture_output=True,
-                    text=True
+                    text=True,
+                    env=exec_env
                 )
                 if proc.returncode == 0:
                     return True, proc.stdout

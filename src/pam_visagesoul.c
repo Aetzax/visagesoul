@@ -167,6 +167,12 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     const char *username = NULL;
     int debug = 0;
 
+    /* Fast bypass if caller explicitly requested no biometric PAM (e.g. inside VisageSoul GUI) */
+    const char *bypass_env = getenv("VISAGESOUL_NO_PAM");
+    if (bypass_env && (strcmp(bypass_env, "1") == 0 || strcmp(bypass_env, "true") == 0)) {
+        return PAM_IGNORE;
+    }
+
     int retval = pam_get_user(pamh, &username, NULL);
     if (retval != PAM_SUCCESS || username == NULL || strlen(username) == 0) {
         return PAM_USER_UNKNOWN;
