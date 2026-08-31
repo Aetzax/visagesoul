@@ -488,7 +488,17 @@ def cmd_uninstall(args):
     for svc in SUPPORTED_SERVICES:
         pam.disable_service(svc)
 
-    print("2. Eliminando módulos del sistema...")
+    print("2. Desactivando cualquier bypass de pantalla de bienvenida (Autologin)...")
+    pam.set_bypass_welcome_page(False)
+    for home_user in Path("/home").glob("*"):
+        autostart = home_user / ".config" / "autostart" / "visagesoul-startup-lock.desktop"
+        if autostart.is_file():
+            try:
+                autostart.unlink()
+            except Exception:
+                pass
+
+    print("3. Eliminando módulos del sistema...")
     paths_to_remove = [
         "/usr/lib/security/pam_visagesoul.so",
         "/usr/lib/security/pam_aura_auth.so",

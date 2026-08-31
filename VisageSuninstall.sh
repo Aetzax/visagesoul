@@ -50,7 +50,19 @@ for pam_file in /etc/pam.d/*; do
     fi
 done
 
-echo -e "\n${BLUE}2. Eliminando componentes de VisageSoul del sistema...${NC}"
+echo -e "\n${BLUE}2. Eliminando componentes de VisageSoul y limpiando gestores de inicio...${NC}"
+# Limpiar Bypass Welcome Page y Autologin
+rm -f /etc/sddm.conf.d/autologin.conf
+rm -f /etc/lightdm/lightdm.conf.d/80-visagesoul-autologin.conf
+for gdm_conf in /etc/gdm/custom.conf /etc/gdm3/custom.conf; do
+    if [ -f "$gdm_conf" ]; then
+        sed -i '/AutomaticLogin/d' "$gdm_conf"
+    fi
+done
+rm -f /home/*/.config/autostart/visagesoul-startup-lock.desktop
+rm -f /root/.config/autostart/visagesoul-startup-lock.desktop
+rm -rf /run/visagesoul /tmp/visagesoul_*
+
 rm -rf /opt/visagesoul
 rm -rf /opt/aura-auth
 rm -f /usr/lib/security/pam_visagesoul.so
