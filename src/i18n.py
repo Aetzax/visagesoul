@@ -93,7 +93,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "about_group": "Acerca de VisageSoul y Créditos",
         "about_desc": "Autenticación biométrica facial y gestual de nueva generación para Linux.",
         "credits_title": "Créditos y Agradecimientos",
-        "btn_open_repo": "Abrir Repositorio Oficial en GitHub (Aetzax/visagesoul)",
+        "btn_open_repo": "🌐 Repositorio Oficial en GitHub (Aetzax/visagesoul)",
+        "btn_donate": "💖 Apoyar el Proyecto / Donar (PayPal)",
     },
     "en": {
         # App & Header
@@ -179,7 +180,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "about_group": "About VisageSoul & Credits",
         "about_desc": "Next-gen biometric facial and gestural authentication for Linux.",
         "credits_title": "Credits & Acknowledgments",
-        "btn_open_repo": "Open Official GitHub Repository (Aetzax/visagesoul)",
+        "btn_open_repo": "🌐 Official GitHub Repository (Aetzax/visagesoul)",
+        "btn_donate": "💖 Support the Project / Donate (PayPal)",
     }
 }
 

@@ -160,6 +160,12 @@ To cleanly remove VisageSoul and restore default PAM configurations:
 sudo ./VisageSuninstall.sh
 ```
 
+## Support & Donations
+
+If you find VisageSoul useful and want to support ongoing development, consider buying a coffee or contributing:
+
+- 💖 **PayPal:** [paypal.me/aetzax1](https://paypal.me/aetzax1)
+
 ## License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).

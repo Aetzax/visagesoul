@@ -883,11 +883,19 @@ class MainWindow(QMainWindow):
         lbl_about_info.setStyleSheet("color: #a9b1d6; line-height: 1.4;")
         ab_layout.addWidget(lbl_about_info)
 
+        links_box = QHBoxLayout()
         btn_repo = QPushButton(tr("btn_open_repo"))
         btn_repo.setObjectName("primaryBtn")
         btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/Aetzax/visagesoul")))
-        ab_layout.addWidget(btn_repo)
+
+        btn_donate = QPushButton(tr("btn_donate"))
+        btn_donate.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://paypal.me/aetzax1")))
+
+        links_box.addWidget(btn_repo)
+        links_box.addWidget(btn_donate)
+        ab_layout.addLayout(links_box)
 
         layout.addWidget(about_group)
 
