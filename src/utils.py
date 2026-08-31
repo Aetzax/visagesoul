@@ -194,3 +194,75 @@ def warmup_camera(cap: cv2.VideoCapture, frames: int = 5):
     """Discards initial frames to let the sensor adjust auto-exposure and white balance."""
     for _ in range(max(1, frames)):
         cap.grab()
+
+
+class ScreenFlashManager:
+    """
+    Context manager that temporarily boosts display brightness during biometric verification
+    to provide soft fill light for the user's face and hand in low-light environments.
+    """
+    def __init__(self, enabled: bool = True, boost_percent: int = 25):
+        self.enabled = enabled
+        self.boost_percent = boost_percent
+        self.prev_brightness = None
+        self.method = None
+
+    def __enter__(self):
+        if not self.enabled or self.boost_percent <= 0:
+            return self
+
+        try:
+            # 1. Try KDE Solid PowerManagement D-Bus
+            qdbus = shutil_which("qdbus6") or shutil_which("qdbus")
+            if qdbus:
+                res_max = subprocess.run(
+                    [qdbus, "org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl", "org.kde.Solid.PowerManagement.Actions.BrightnessControl.brightnessMax"],
+                    capture_output=True, text=True, timeout=0.25
+                )
+                res_curr = subprocess.run(
+                    [qdbus, "org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl", "org.kde.Solid.PowerManagement.Actions.BrightnessControl.brightness"],
+                    capture_output=True, text=True, timeout=0.25
+                )
+                if res_max.returncode == 0 and res_curr.returncode == 0:
+                    max_b = int(res_max.stdout.strip())
+                    curr_b = int(res_curr.stdout.strip())
+                    if max_b > 0:
+                        boost_val = int(max_b * (self.boost_percent / 100.0))
+                        target_b = min(max_b, curr_b + boost_val)
+                        if target_b > curr_b:
+                            subprocess.run(
+                                [qdbus, "org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl", "org.kde.Solid.PowerManagement.Actions.BrightnessControl.setBrightness", str(target_b)],
+                                capture_output=True, text=True, timeout=0.25
+                            )
+                            self.prev_brightness = curr_b
+                            self.method = ("kde", qdbus)
+                            return self
+
+            # 2. Try brightnessctl
+            bctl = shutil_which("brightnessctl")
+            if bctl:
+                res_curr = subprocess.run([bctl, "g"], capture_output=True, text=True, timeout=0.25)
+                if res_curr.returncode == 0:
+                    curr_b = int(res_curr.stdout.strip())
+                    subprocess.run([bctl, "s", f"+{self.boost_percent}%"], capture_output=True, text=True, timeout=0.25)
+                    self.prev_brightness = curr_b
+                    self.method = ("bctl", bctl)
+                    return self
+        except Exception:
+            pass
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.prev_brightness is not None and self.method:
+            try:
+                m_type, binary = self.method
+                if m_type == "kde":
+                    subprocess.run(
+                        [binary, "org.kde.Solid.PowerManagement", "/org/kde/Solid/PowerManagement/Actions/BrightnessControl", "org.kde.Solid.PowerManagement.Actions.BrightnessControl.setBrightness", str(self.prev_brightness)],
+                        capture_output=True, text=True, timeout=0.25
+                    )
+                elif m_type == "bctl":
+                    subprocess.run([binary, "s", str(self.prev_brightness)], capture_output=True, text=True, timeout=0.25)
+            except Exception:
+                pass

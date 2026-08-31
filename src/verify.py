@@ -27,7 +27,7 @@ current_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(current_dir.parent))
 
 from src.config import config
-from src.utils import setup_logger, open_camera, warmup_camera, play_chime, check_and_boost_light
+from src.utils import setup_logger, open_camera, warmup_camera, play_chime, check_and_boost_light, ScreenFlashManager
 from src.engine import FaceEngine, GestureEngine
 
 
@@ -148,16 +148,18 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
         logger.error(f"Unable to access camera {device_path}.")
         return 2
 
-    liveness_check = config.getboolean("security", "liveness_check", True)
+    screen_flash = config.getboolean("camera", "screen_flash", True)
+    screen_flash_boost = config.getint("camera", "screen_flash_boost", 20)
 
     try:
-        # Sensor warmup
-        warmup_camera(cap, warmup_frames)
+        with ScreenFlashManager(enabled=screen_flash, boost_percent=screen_flash_boost):
+            # Sensor warmup
+            warmup_camera(cap, warmup_frames)
 
-        start_time = time.time()
-        consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 2
-        face_history = []
+            start_time = time.time()
+            consecutive_matches = 0
+            REQUIRED_CONSECUTIVE_MATCHES = 2
+            face_history = []
 
         while (time.time() - start_time) < timeout:
             ret, frame = cap.read()

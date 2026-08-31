@@ -27,6 +27,8 @@ DEFAULT_CONFIG = {
         "fps": "30",
         "warmup_frames": "5",
         "low_light_boost": "true",
+        "screen_flash": "true",
+        "screen_flash_boost": "25",
     },
     "security": {
         "threshold": "0.70",
