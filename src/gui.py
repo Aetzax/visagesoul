@@ -285,7 +285,7 @@ class MainWindow(QMainWindow):
         self.init_ui()
 
     def execute_elevated(self, args: List[str], prompt_title: str = "Permisos de Administrador", prompt_message: str = "Introduce la contraseña de sudo:") -> tuple[bool, str]:
-        """Executes visagesoul CLI commands with elevated root permissions using pkexec or fallback Qt password dialog."""
+        """Executes visagesoul CLI commands with elevated root permissions using native Qt password dialog."""
         was_camera_running = False
         if self.camera_worker and self.camera_worker.isRunning():
             was_camera_running = True
@@ -297,11 +297,6 @@ class MainWindow(QMainWindow):
         exec_env["VISAGESOUL_NO_PAM"] = "1"
 
         try:
-            if os.geteuid() == 0:
-                cli_bin = str(Path(__file__).resolve().parent / "cli.py")
-                res = subprocess.run([sys.executable, cli_bin] + args, capture_output=True, text=True, env=exec_env)
-                return (res.returncode == 0, res.stdout or res.stderr)
-
             cli_bin = "/usr/local/bin/visagesoul"
             if not os.path.exists(cli_bin):
                 cli_bin = str(Path(__file__).resolve().parent / "cli.py")
@@ -318,6 +313,11 @@ class MainWindow(QMainWindow):
             )
             if not ok or not password:
                 return False, "Operación cancelada por el usuario."
+
+            if os.geteuid() == 0:
+                cli_bin = str(Path(__file__).resolve().parent / "cli.py")
+                res = subprocess.run([sys.executable, cli_bin] + args, capture_output=True, text=True, env=exec_env)
+                return (res.returncode == 0, res.stdout or res.stderr)
 
             sudo_cmd = ["sudo", "--preserve-env=VISAGESOUL_NO_PAM", "-S", "-p", ""] + cmd_base + args
             try:
@@ -608,53 +608,38 @@ class MainWindow(QMainWindow):
                         username = os.environ.get("SUDO_USER") or getpass.getuser()
                         label = self.combo_aspect.currentText().strip() or "Principal"
 
-                        # Direct save first
-                        saved_direct = self.engine.save_profile(
-                            username,
-                            self.enrolled_samples,
-                            label=label,
-                            append=True,
-                            metadata={"camera": config.get("camera", "device", "/dev/video0")}
-                        )
+                        temp_file = Path(f"/tmp/visagesoul_enroll_{username}_{int(time.time())}.json")
+                        data = {
+                            "username": username,
+                            "label": label,
+                            "created_at": datetime.datetime.now().isoformat(),
+                            "sample_count": len(self.enrolled_samples),
+                            "embeddings": [emb.tolist() for emb in self.enrolled_samples],
+                            "metadata": {"camera": config.get("camera", "device", "/dev/video0")},
+                        }
+                        try:
+                            with open(temp_file, "w", encoding="utf-8") as f:
+                                json.dump(data, f, indent=2)
 
-                        if saved_direct:
-                            self.lbl_status_msg.setText(tr("enroll_success", label=label, user=username))
-                            self.refresh_user_list()
-                            play_chime("match")
-                            QMessageBox.information(self, "Éxito", tr("enroll_success", label=label, user=username))
-                        else:
-                            temp_file = Path(f"/tmp/visagesoul_enroll_{username}_{int(time.time())}.json")
-                            data = {
-                                "username": username,
-                                "label": label,
-                                "created_at": datetime.datetime.now().isoformat(),
-                                "sample_count": len(self.enrolled_samples),
-                                "embeddings": [emb.tolist() for emb in self.enrolled_samples],
-                                "metadata": {"camera": config.get("camera", "device", "/dev/video0")},
-                            }
-                            try:
-                                with open(temp_file, "w", encoding="utf-8") as f:
-                                    json.dump(data, f, indent=2)
-
-                                ok, msg = self.execute_elevated(
-                                    ["save-profile", "--user", username, "--file", str(temp_file)],
-                                    "Guardar Perfil Facial",
-                                    f"Introduce la contraseña de administrador para registrar el aspecto '{label}' de '{username}':"
-                                )
-                                if ok:
-                                    self.lbl_status_msg.setText(tr("enroll_success", label=label, user=username))
-                                    self.refresh_user_list()
-                                    play_chime("match")
-                                    QMessageBox.information(self, "Éxito", tr("enroll_success", label=label, user=username))
-                                else:
-                                    self.lbl_status_msg.setText("Error al guardar el perfil.")
-                                    QMessageBox.warning(self, "Error", f"No se pudo guardar el perfil facial:\n{msg}")
-                            finally:
-                                if temp_file.is_file():
-                                    try:
-                                        temp_file.unlink()
-                                    except Exception:
-                                        pass
+                            ok, msg = self.execute_elevated(
+                                ["save-profile", "--user", username, "--file", str(temp_file)],
+                                "Confirmación de Seguridad",
+                                f"Introduce la contraseña de tu usuario '{username}' para registrar el aspecto '{label}':"
+                            )
+                            if ok:
+                                self.lbl_status_msg.setText(tr("enroll_success", label=label, user=username))
+                                self.refresh_user_list()
+                                play_chime("match")
+                                QMessageBox.information(self, "Éxito", tr("enroll_success", label=label, user=username))
+                            else:
+                                self.lbl_status_msg.setText("Registro cancelado o contraseña incorrecta.")
+                                QMessageBox.warning(self, "Registro Cancelado", f"No se pudo guardar el perfil facial:\n{msg}")
+                        finally:
+                            if temp_file.is_file():
+                                try:
+                                    temp_file.unlink()
+                                except Exception:
+                                    pass
 
         rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_frame.shape
