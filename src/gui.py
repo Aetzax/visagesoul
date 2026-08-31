@@ -309,16 +309,7 @@ class MainWindow(QMainWindow):
             else:
                 cmd_base = [cli_bin]
 
-            # 1. Try pkexec (Polkit KDE GUI dialog)
-            try:
-                pk_cmd = ["pkexec", "env", "VISAGESOUL_NO_PAM=1"] + cmd_base + args
-                res = subprocess.run(pk_cmd, capture_output=True, text=True, env=exec_env)
-                if res.returncode == 0:
-                    return True, res.stdout
-            except Exception:
-                pass
-
-            # 2. Prompt user with Qt Password Dialog
+            # 1. Prompt user with native Qt Password Dialog
             password, ok = QInputDialog.getText(
                 self,
                 prompt_title,
