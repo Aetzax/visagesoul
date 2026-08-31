@@ -390,10 +390,12 @@ class MainWindow(QMainWindow):
         self.lbl_camera_status = QLabel(tr("cam_status") + " ...")
         self.lbl_pam_status = QLabel(tr("pam_status") + " ...")
         self.lbl_gesture_status = QLabel(tr("gesture_status") + " ...")
+        self.lbl_welcome_status = QLabel(tr("welcome_status") + " ...")
 
         status_layout.addWidget(self.lbl_camera_status)
         status_layout.addWidget(self.lbl_pam_status)
         status_layout.addWidget(self.lbl_gesture_status)
+        status_layout.addWidget(self.lbl_welcome_status)
 
         layout.addWidget(status_group)
 
@@ -462,6 +464,13 @@ class MainWindow(QMainWindow):
         else:
             self.lbl_gesture_status.setText(f"{tr('gesture_status')} {tr('gesture_inactive')}")
             self.lbl_gesture_status.setStyleSheet("color: #7aa2f7;")
+
+        if self.pam.is_bypass_welcome_page_enabled():
+            self.lbl_welcome_status.setText(f"{tr('welcome_status')} {tr('welcome_bypassed')}")
+            self.lbl_welcome_status.setStyleSheet("color: #7dcfff;")
+        else:
+            self.lbl_welcome_status.setText(f"{tr('welcome_status')} {tr('welcome_standard')}")
+            self.lbl_welcome_status.setStyleSheet("color: #7aa2f7;")
 
         self.refresh_user_list()
 
@@ -667,6 +676,8 @@ class MainWindow(QMainWindow):
         self.chk_kde = QCheckBox(tr("chk_kde"))
         self.chk_sudo = QCheckBox(tr("chk_sudo"))
         self.chk_polkit = QCheckBox(tr("chk_polkit"))
+        self.chk_bypass_welcome = QCheckBox(tr("chk_bypass_welcome"))
+        self.chk_bypass_welcome.setToolTip(tr("chk_bypass_welcome_tooltip"))
 
         self.load_pam_checkbox_states()
 
@@ -674,6 +685,7 @@ class MainWindow(QMainWindow):
         p_layout.addWidget(self.chk_kde)
         p_layout.addWidget(self.chk_sudo)
         p_layout.addWidget(self.chk_polkit)
+        p_layout.addWidget(self.chk_bypass_welcome)
         layout.addWidget(pam_group)
 
         # Unlock Rules & Gestures
@@ -724,6 +736,7 @@ class MainWindow(QMainWindow):
         self.chk_kde.setChecked(statuses.get("kde", {}).get("enabled", False))
         self.chk_sudo.setChecked(statuses.get("sudo", {}).get("enabled", False))
         self.chk_polkit.setChecked(statuses.get("polkit-1", {}).get("enabled", False))
+        self.chk_bypass_welcome.setChecked(self.pam.is_bypass_welcome_page_enabled())
 
     def save_security_settings(self):
         # 1. Update config values
@@ -739,8 +752,16 @@ class MainWindow(QMainWindow):
         kde_val = "on" if self.chk_kde.isChecked() else "off"
         sudo_val = "on" if self.chk_sudo.isChecked() else "off"
         polkit_val = "on" if self.chk_polkit.isChecked() else "off"
+        bypass_val = "on" if self.chk_bypass_welcome.isChecked() else "off"
 
-        apply_args = ["apply-pam", f"--sddm={sddm_val}", f"--kde={kde_val}", f"--sudo={sudo_val}", f"--polkit={polkit_val}"]
+        apply_args = [
+            "apply-pam",
+            f"--sddm={sddm_val}",
+            f"--kde={kde_val}",
+            f"--sudo={sudo_val}",
+            f"--polkit={polkit_val}",
+            f"--bypass-welcome={bypass_val}"
+        ]
 
         ok, msg = self.execute_elevated(
             apply_args,

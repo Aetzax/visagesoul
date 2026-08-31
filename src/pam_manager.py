@@ -194,3 +194,59 @@ class PamManager:
             if backup and backup.is_file():
                 shutil.copy2(backup, etc_path)
             return False, f"Error al modificar {etc_path}: {e}"
+
+    def is_bypass_welcome_page_enabled(self) -> bool:
+        """Checks if SDDM autologin + instant lock is configured."""
+        sddm_conf = Path("/etc/sddm.conf.d/autologin.conf")
+        if sddm_conf.is_file():
+            return True
+        main_conf = Path("/etc/sddm.conf")
+        if main_conf.is_file():
+            try:
+                with open(main_conf, "r", encoding="utf-8") as f:
+                    return "[Autologin]" in f.read()
+            except Exception:
+                pass
+        return False
+
+    def set_bypass_welcome_page(self, enable: bool, username: Optional[str] = None, session: str = "plasma") -> Tuple[bool, str]:
+        """Configures or removes SDDM autologin + autostart lock."""
+        import getpass
+        if not username:
+            username = os.environ.get("SUDO_USER") or getpass.getuser()
+
+        sddm_dir = Path("/etc/sddm.conf.d")
+        sddm_conf = sddm_dir / "autologin.conf"
+
+        user_home = Path(f"/home/{username}") if username != "root" else Path("/root")
+        autostart_file = user_home / ".config" / "autostart" / "visagesoul-startup-lock.desktop"
+
+        if enable:
+            try:
+                sddm_dir.mkdir(parents=True, exist_ok=True)
+                with open(sddm_conf, "w", encoding="utf-8") as f:
+                    f.write(f"[Autologin]\nUser={username}\nSession={session}\n")
+
+                autostart_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(autostart_file, "w", encoding="utf-8") as f:
+                    f.write("[Desktop Entry]\nType=Application\nName=VisageSoul Startup Lock\nExec=loginctl lock-session\nTerminal=false\nStartupNotify=false\nX-KDE-autostart-phase=0\n")
+
+                if username != "root":
+                    import pwd
+                    try:
+                        pw = pwd.getpwnam(username)
+                        os.chown(autostart_file, pw.pw_uid, pw.pw_gid)
+                    except Exception:
+                        pass
+                return True, f"Bypass de bienvenida activado correctamente para {username}."
+            except Exception as e:
+                return False, f"Error al activar bypass de bienvenida: {e}"
+        else:
+            try:
+                if sddm_conf.is_file():
+                    sddm_conf.unlink()
+                if autostart_file.is_file():
+                    autostart_file.unlink()
+                return True, "Bypass de bienvenida desactivado."
+            except Exception as e:
+                return False, f"Error al desactivar bypass de bienvenida: {e}"

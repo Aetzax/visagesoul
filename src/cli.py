@@ -461,6 +461,14 @@ def cmd_apply_pam(args):
             ok, msg = pam.disable_service(svc)
             results.append(f"[VisageSoul] {svc}: {'OK' if ok else 'FAIL'} - {msg}")
 
+    if hasattr(args, "bypass_welcome") and args.bypass_welcome != "ignore":
+        if args.bypass_welcome == "on":
+            ok, msg = pam.set_bypass_welcome_page(True)
+            results.append(f"[VisageSoul] bypass-welcome: {'OK' if ok else 'FAIL'} - {msg}")
+        elif args.bypass_welcome == "off":
+            ok, msg = pam.set_bypass_welcome_page(False)
+            results.append(f"[VisageSoul] bypass-welcome: {'OK' if ok else 'FAIL'} - {msg}")
+
     print("\n".join(results))
     return 0
 
@@ -670,6 +678,7 @@ def main():
     p_apply.add_argument("--kde", choices=["on", "off", "ignore"], default="ignore")
     p_apply.add_argument("--sudo", choices=["on", "off", "ignore"], default="ignore")
     p_apply.add_argument("--polkit", choices=["on", "off", "ignore"], default="ignore")
+    p_apply.add_argument("--bypass-welcome", choices=["on", "off", "ignore"], default="ignore")
     p_apply.set_defaults(func=cmd_apply_pam)
 
     # save-profile (internal / GUI)
