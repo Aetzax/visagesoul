@@ -707,7 +707,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(sec_group)
 
-        # Lock screen message
+        # Messages & Visual Feedback
         msg_group = QGroupBox(tr("lock_msg_group"))
         m_form = QFormLayout(msg_group)
 
@@ -721,6 +721,16 @@ class MainWindow(QMainWindow):
             cur_msg = tr("default_pam_message")
         self.edit_pam_msg.setText(cur_msg)
         m_form.addRow(tr("pam_message_label"), self.edit_pam_msg)
+
+        self.chk_cursor_feedback = QCheckBox(tr("chk_cursor_feedback"))
+        self.chk_cursor_feedback.setChecked(config.getboolean("pam", "cursor_feedback", True))
+        self.chk_cursor_feedback.setToolTip(tr("chk_cursor_feedback_tooltip"))
+        m_form.addRow("Puntero del Ratón:", self.chk_cursor_feedback)
+
+        self.chk_osd_notify = QCheckBox(tr("chk_osd_notify"))
+        self.chk_osd_notify.setChecked(config.getboolean("pam", "osd_notify", True))
+        self.chk_osd_notify.setToolTip(tr("chk_osd_notify_tooltip"))
+        m_form.addRow("Aviso de Escritorio:", self.chk_osd_notify)
 
         layout.addWidget(msg_group)
 
@@ -747,6 +757,8 @@ class MainWindow(QMainWindow):
         config.set("security", "auto_unlock", "true" if self.chk_auto_unlock.isChecked() else "false")
         config.set("security", "max_attempts", self.spin_max_attempts.value())
         config.set("pam", "notify", "true" if self.chk_pam_notify.isChecked() else "false")
+        config.set("pam", "cursor_feedback", "true" if self.chk_cursor_feedback.isChecked() else "false")
+        config.set("pam", "osd_notify", "true" if self.chk_osd_notify.isChecked() else "false")
         config.set("pam", "message", self.edit_pam_msg.text().strip() or tr("default_pam_message"))
         config.save()
 
