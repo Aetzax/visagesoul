@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ -d "$SCRIPT_DIR/.venv" ]; then
+    PYTHON_BIN="$SCRIPT_DIR/.venv/bin/python"
+elif [ -d "/opt/visagesoul/venv" ]; then
+    PYTHON_BIN="/opt/visagesoul/venv/bin/python"
+else
+    PYTHON_BIN="python3"
+fi
+
+exec "$PYTHON_BIN" "$SCRIPT_DIR/src/cli.py" "$@"

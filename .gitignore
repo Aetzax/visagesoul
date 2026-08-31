@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+env/
+venv/
+ENV/
+
+# Compiled C binaries
+*.o
+pam_visagesoul.so
+pam_aura_auth.so
+
+# Large Neural Models (downloaded automatically via scripts/download_models.sh)
+models/*.onnx
+models/*.task
+
+# User Face Data & Biometric Templates (Privacy & Security)
+faces/
+*.json
+!config/config.ini
+
+# Logs & Temporary files
+*.log
+/tmp/
+*.bak*
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*~

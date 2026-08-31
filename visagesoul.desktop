@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=VisageSoul
+GenericName=Autenticación Facial Biométrica
+Comment=Configurador de inicio de sesión facial y gestual para SDDM y KDE Plasma
+Exec=/usr/local/bin/visagesoul gui
+Icon=visagesoul
+Terminal=false
+Type=Application
+Categories=Settings;System;Security;Qt;KDE;
+Keywords=face;auth;login;biometrics;sddm;pam;security;visagesoul;
+StartupNotify=true
+StartupWMClass=visagesoul
