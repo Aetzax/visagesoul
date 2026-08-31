@@ -112,28 +112,41 @@ class FaceEngine:
 
     def compute_liveness_score(self, face_history: List[np.ndarray]) -> float:
         """
-        Analyzes micro-movement & landmark jitter across consecutive frames.
-        Computes the standard deviation of 3D normalized eye-to-nose-to-mouth geometric ratios.
-        Live humans have natural micro-saccades and breathing (> 0.0001),
-        while flat static printed photos or fixed screens have flat variance (< 0.00003).
+        Analyzes 3D non-rigid parallax & landmark micro-fluctuations across consecutive frames.
+        Computes standard deviation of yaw-asymmetry ratio and eye-to-mouth triangle proportions.
+        Live humans exhibit natural 3D projective perspective changes and micro-saccades (> 0.0012),
+        while flat 2D printed photos or phone screens move strictly as rigid 2D affine planes (~0.0000).
         """
         if len(face_history) < 3:
-            return 0.001
+            return 0.01  # Initial bootstrap
 
-        ratios = []
+        yaw_ratios = []
+        tri_ratios = []
         for f in face_history:
-            w = max(1.0, float(f[2]))
-            h = max(1.0, float(f[3]))
+            if len(f) < 14:
+                continue
             re_x, re_y = float(f[4]), float(f[5])
             le_x, le_y = float(f[6]), float(f[7])
             nose_x, nose_y = float(f[8]), float(f[9])
+            rcm_x, rcm_y = float(f[10]), float(f[11])
+            lcm_x, lcm_y = float(f[12]), float(f[13])
+
+            d_re_nose = np.sqrt((nose_x - re_x)**2 + (nose_y - re_y)**2)
+            d_le_nose = np.sqrt((nose_x - le_x)**2 + (nose_y - le_y)**2)
+            yaw_ratio = (d_re_nose - d_le_nose) / (d_re_nose + d_le_nose + 1e-6)
 
             eye_dist = np.sqrt((le_x - re_x)**2 + (le_y - re_y)**2)
-            nose_dist = np.sqrt((nose_x - (re_x + le_x)/2.0)**2 + (nose_y - (re_y + le_y)/2.0)**2)
-            ratio = (eye_dist / w) * (nose_dist / h)
-            ratios.append(ratio)
+            mouth_dist = np.sqrt((lcm_x - rcm_x)**2 + (lcm_y - rcm_y)**2)
+            tri_ratio = eye_dist / (mouth_dist + 1e-6)
 
-        return float(np.std(ratios))
+            yaw_ratios.append(yaw_ratio)
+            tri_ratios.append(tri_ratio)
+
+        if not yaw_ratios or not tri_ratios:
+            return 0.0
+
+        score = float(np.std(yaw_ratios) + np.std(tri_ratios))
+        return score
 
     def get_profile_path(self, username: str) -> Path:
         return self.faces_dir / f"{username}.json"

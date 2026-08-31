@@ -204,6 +204,9 @@ def cmd_test(args):
 
     print("Mostrando feed de cámara. Presiona 'q' en la ventana para salir.\n")
 
+    face_history = []
+    liveness_check = config.getboolean("security", "liveness_check", True)
+
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
@@ -221,8 +224,19 @@ def cmd_test(args):
         cv2.rectangle(display_frame, (0, 0), (w, 55), (20, 20, 20), -1)
 
         if primary_face is not None:
+            face_history.append(primary_face)
+            if len(face_history) > 8:
+                face_history.pop(0)
+
             bx, by, bw, bh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
             mirrored_bx = w - (bx + bw)
+
+            liveness_ok = True
+            liveness_val = 0.0
+            if liveness_check and len(face_history) >= 4:
+                liveness_val = engine.compute_liveness_score(face_history)
+                if liveness_val < 0.0012:
+                    liveness_ok = False
 
             score_text = "Sin perfil cargado"
             box_color = (255, 255, 0)
@@ -232,7 +246,10 @@ def cmd_test(args):
                 is_match, score = engine.verify_against_profile(target_emb, user_embeddings, threshold=threshold)
                 pct = int(score * 100)
 
-                if is_match:
+                if is_match and not liveness_ok:
+                    box_color = (0, 140, 255)
+                    score_text = f"FOTO/PANTALLA DETECTADA (Liveness: {liveness_val:.5f} < 0.0012)"
+                elif is_match and liveness_ok:
                     if require_gesture:
                         if gesture_valid:
                             box_color = (0, 255, 0)
@@ -240,10 +257,10 @@ def cmd_test(args):
                         else:
                             box_color = (0, 200, 255)
                             hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta (🖐️)" if gesture_mode == "open_palm" else "Pulgar arriba (👍)")
-                            score_text = f"Rostro OK ({pct}%) -> Muestra {hint}"
+                            score_text = f"Rostro Vivo ({pct}%) -> Muestra {hint}"
                     else:
                         box_color = (0, 255, 0)
-                        score_text = f"AUTORIZADO: {username} ({pct}% similitud)"
+                        score_text = f"AUTORIZADO: {username} ({pct}% similitud | Liveness OK)"
                 else:
                     box_color = (0, 0, 255)
                     score_text = f"NO COINCIDE ({pct}% / req {int(threshold*100)}%)"
