@@ -40,9 +40,10 @@ if [ -d "/etc/aura-auth/faces" ] && [ -n "$(ls -A /etc/aura-auth/faces 2>/dev/nu
 fi
 
 chmod 755 /etc/visagesoul
-chmod 666 /etc/visagesoul/config.ini 2>/dev/null || true
-chmod 1777 /etc/visagesoul/faces
-chmod 666 /etc/visagesoul/faces/*.json 2>/dev/null || true
+chmod 644 /etc/visagesoul/config.ini 2>/dev/null || true
+chmod 755 /etc/visagesoul/faces
+chmod 644 /etc/visagesoul/faces/*.json 2>/dev/null || true
+chown -R root:root /etc/visagesoul 2>/dev/null || true
 
 echo -e "\n${BLUE}2. Actualizando caché de iconos y lanzadores del sistema...${NC}"
 gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true

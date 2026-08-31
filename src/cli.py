@@ -330,11 +330,12 @@ def cmd_remove(args):
 def cmd_save_profile(args):
     """Saves a profile from a temporary file with root privileges (internal / GUI helper)."""
     if os.geteuid() != 0:
+        print("Error: Se requieren permisos de administrador (root) para guardar perfiles faciales.", file=sys.stderr)
         return 1
     username = args.user
     temp_file = Path(args.file)
     if not temp_file.is_file():
-        print(f"Error: {temp_file} not found.", file=sys.stderr)
+        print(f"Error: Archivo temporal {temp_file} no encontrado.", file=sys.stderr)
         return 1
     try:
         with open(temp_file, "r", encoding="utf-8") as f:
@@ -351,9 +352,10 @@ def cmd_save_profile(args):
             print(f"Aspecto '{label}' para {username} guardado exitosamente.")
             return 0
         else:
+            print(f"Error: No se pudo escribir el perfil facial para {username}.", file=sys.stderr)
             return 1
     except Exception as e:
-        print(f"Error saving profile: {e}", file=sys.stderr)
+        print(f"Error al guardar el perfil: {e}", file=sys.stderr)
         return 1
 
 

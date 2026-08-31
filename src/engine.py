@@ -192,16 +192,23 @@ class FaceEngine:
 
         try:
             profile_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(profile_path, "w", encoding="utf-8") as f:
+            temp_path = profile_path.with_suffix(f".tmp.{os.getpid()}")
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             try:
-                os.chmod(profile_path, 0o644)
+                os.chmod(temp_path, 0o644)
             except Exception:
                 pass
+            os.replace(temp_path, profile_path)
             return True
         except Exception as e:
             logger.error(f"Failed to save profile for {username}: {e}")
+            if "temp_path" in locals() and temp_path.is_file():
+                try:
+                    temp_path.unlink()
+                except Exception:
+                    pass
             return False
 
     def get_user_models(self, username: str) -> List[Dict[str, Any]]:
