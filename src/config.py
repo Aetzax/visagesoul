@@ -48,8 +48,6 @@ DEFAULT_CONFIG = {
     "pam": {
         "debug": "false",
         "notify": "true",
-        "cursor_feedback": "true",
-        "osd_notify": "true",
         "message": "Esperando biometría...",
     },
 }

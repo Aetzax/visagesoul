@@ -27,7 +27,7 @@ current_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(current_dir.parent))
 
 from src.config import config
-from src.utils import setup_logger, open_camera, warmup_camera, play_chime, check_and_boost_light, CursorFeedbackManager
+from src.utils import setup_logger, open_camera, warmup_camera, play_chime, check_and_boost_light
 from src.engine import FaceEngine, GestureEngine
 
 
@@ -148,19 +148,16 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
         logger.error(f"Unable to access camera {device_path}.")
         return 2
 
-    cursor_feedback = config.getboolean("pam", "cursor_feedback", True)
-    osd_notify = config.getboolean("pam", "osd_notify", True)
-    pam_msg = config.get("pam", "message", "Esperando biometría...")
+    liveness_check = config.getboolean("security", "liveness_check", True)
 
     try:
-        with CursorFeedbackManager(enabled=cursor_feedback, osd_enabled=osd_notify, message=pam_msg):
-            # Sensor warmup
-            warmup_camera(cap, warmup_frames)
+        # Sensor warmup
+        warmup_camera(cap, warmup_frames)
 
-            start_time = time.time()
-            consecutive_matches = 0
-            REQUIRED_CONSECUTIVE_MATCHES = 2
-            face_history = []
+        start_time = time.time()
+        consecutive_matches = 0
+        REQUIRED_CONSECUTIVE_MATCHES = 2
+        face_history = []
 
         while (time.time() - start_time) < timeout:
             ret, frame = cap.read()
