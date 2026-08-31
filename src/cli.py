@@ -228,12 +228,13 @@ def cmd_test(args):
             mirrored_bx = w - (bx + bw)
 
             liveness_ok = True
-            liveness_msg = "Liveness OK"
+            liveness_msg = "Rostro 3D Vivo"
             if liveness_check:
                 liveness_ok, liveness_val, liveness_msg = engine.check_liveness(raw_frame, primary_face)
 
             score_text = "Sin perfil cargado"
             box_color = (255, 255, 0)
+            bar_color = (30, 30, 30)
 
             if user_embeddings:
                 target_emb = engine.extract_embedding(raw_frame, primary_face)
@@ -242,49 +243,57 @@ def cmd_test(args):
 
                 if is_match and not liveness_ok:
                     box_color = (0, 140, 255)
-                    score_text = f"⚠️ {liveness_msg}"
+                    bar_color = (0, 70, 180)
+                    score_text = f"[!] ALERTA: {liveness_msg}"
                 elif is_match and liveness_ok:
                     if require_gesture:
                         if gesture_valid:
                             box_color = (0, 255, 0)
-                            score_text = f"AUTORIZADO: {username} ({pct}%) + {valid_gesture_name}"
+                            bar_color = (20, 120, 20)
+                            clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
+                            score_text = f"[OK] AUTORIZADO: {username} ({pct}%) + {clean_gesture_name}"
                         else:
                             box_color = (0, 200, 255)
-                            hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta (🖐️)" if gesture_mode == "open_palm" else "Pulgar arriba (👍)")
-                            score_text = f"Rostro 3D Vivo ({pct}%) -> Muestra {hint}"
+                            bar_color = (140, 100, 0)
+                            hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta" if gesture_mode == "open_palm" else "Pulgar arriba")
+                            score_text = f"[OK] Rostro 3D Vivo ({pct}%) -> Muestra {hint}"
                     else:
                         box_color = (0, 255, 0)
-                        score_text = f"AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
+                        bar_color = (20, 120, 20)
+                        score_text = f"[OK] AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
                 else:
                     box_color = (0, 0, 255)
-                    score_text = f"NO COINCIDE ({pct}% / req {int(threshold*100)}%)"
+                    bar_color = (20, 20, 120)
+                    score_text = f"[X] NO COINCIDE ({pct}% / req {int(threshold*100)}%)"
 
+            cv2.rectangle(display_frame, (0, 0), (w, 60), bar_color, -1)
             cv2.rectangle(display_frame, (mirrored_bx, by), (mirrored_bx + bw, by + bh), box_color, 2)
             cv2.putText(
                 display_frame,
                 score_text,
-                (20, 38),
+                (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.75,
-                box_color,
+                0.70,
+                (255, 255, 255),
                 2,
             )
         else:
+            cv2.rectangle(display_frame, (0, 0), (w, 60), (30, 30, 30), -1)
             cv2.putText(
                 display_frame,
                 "Esperando rostro...",
-                (20, 38),
+                (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
+                0.75,
                 (200, 200, 200),
                 2,
             )
 
         detected_label = None
         if gesture_name == "Thumb_Up" or is_geom_thumb:
-            detected_label = "Pulgar Arriba (👍)"
+            detected_label = "Pulgar Arriba [OK]"
         elif gesture_name == "Open_Palm" or is_geom_palm:
-            detected_label = "Mano Abierta (🖐️)"
+            detected_label = "Mano Abierta [OK]"
         elif gesture_name and gesture_name != "None":
             detected_label = gesture_name
 
