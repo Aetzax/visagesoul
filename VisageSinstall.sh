@@ -49,6 +49,12 @@ gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
 update-desktop-database /usr/share/applications 2>/dev/null || true
 kbuildsycoca6 2>/dev/null || true
 
+if [ -n "$ACTUAL_USER" ] && [ "$ACTUAL_USER" != "root" ]; then
+    USER_HOME=$(eval echo "~$ACTUAL_USER")
+    rm -f "$USER_HOME/.cache/plasma_theme_"*.kcache "$USER_HOME/.cache/ksycoca6"* 2>/dev/null || true
+    su - "$ACTUAL_USER" -c "kbuildsycoca6 --noincremental 2>/dev/null || true" 2>/dev/null || true
+fi
+
 echo -e "\n${BLUE}3. Comprobando instalación con VisageSoul Doctor...${NC}"
 /usr/local/bin/visagesoul doctor || true
 
