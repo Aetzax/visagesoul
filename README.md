@@ -21,20 +21,24 @@
 
 **VisageSoul** is a modern, high-performance **Windows Hello alternative for Linux** that integrates seamlessly with Linux PAM (Pluggable Authentication Modules). It provides ultra-fast biometric face unlock (~0.3s) for your desktop lock screen, Display Managers (SDDM, GDM, LightDM), Polkit authorization windows, and terminal `sudo` commands using standard RGB webcams or IR cameras.
 
-Powered by state-of-the-art neural vision models (**YuNet** for microsecond face detection and **SFace** for 128D cosine embeddings), paired with **MediaPipe 3D** for optional gesture 2FA confirmation (👍) and **CLAHE** low-light compensation.
+Powered by state-of-the-art neural vision models (**YuNet** for microsecond face detection and **SFace** for 128D cosine embeddings), paired with **MediaPipe 3D** for selectable 2FA gesture confirmation (👍 Thumbs Up, 🖐️ Open Palm, or 🔄 Both), **Multi-Layer Face Anti-Spoofing (FAS)**, and **CLAHE** low-light compensation.
 
 ## Features
 
 - **Session Auto-Unlock**: Seamlessly dismisses the lock screen via `systemd-logind` upon successful face match without requiring extra clicks.
-- **Optional Gesture 2FA**: Require a physical thumbs-up gesture alongside face recognition to prevent accidental unlocks. Uses a hybrid geometric landmark classifier for angle and distance tolerance.
-- **Multiple Aspects per Profile**: Register multiple facial conditions per user (e.g., with glasses, without glasses, different lighting conditions).
-- **PAM Integration**: Native support for KDE Screen Locker (`kscreenlocker`), SDDM, GDM, LightDM, `sudo`, and Polkit.
-- **Anti-Spoofing & Liveness**: 3D micro-movement variance analysis across consecutive frames to prevent flat photo spoofing.
+- **Bypass Welcome Page**: Hands-free direct login on boot for SDDM, GDM, and LightDM with immediate background biometric unlock.
+- **Selectable Gesture 2FA**: Choose your preferred confirmation gesture—**👍 Thumbs Up**, **🖐️ Open Palm**, or **🔄 Both**—to prevent accidental or unauthorized unlocks. Uses hybrid geometric landmark classifiers for distance and angle tolerance.
+- **Multi-Layer Anti-Spoofing (FAS)**:
+  - **2D Fourier Moire Detection**: Catches digital smartphone/tablet screens and LCD/OLED subpixel grids in the frequency spectrum.
+  - **Eye Micro-Gradient Dynamics**: Analyzes natural eye micro-movements and blink dynamics to reject static printed photos.
+  - **3D Non-Rigid Parallax**: Measures real-time depth perspective ratios between facial landmarks.
+- **Multiple Aspects per Profile**: Register multiple facial conditions per user (e.g., with glasses, without glasses, dark lighting, beard).
+- **Native C PAM Integration**: Compiled C security module (`pam_visagesoul.so`) with intelligent recursion detection for administrative tasks (`/proc` inspection). Supports KDE Screen Locker (`kscreenlocker`), SDDM, GDM, LightDM, `sudo`, and Polkit.
 - **Fail-Safe Fallback**: If the camera is busy, disconnected, or recognition times out, PAM immediately falls back to standard password authentication without locking you out.
 - **Lockout Protection**: Configurable limit for failed attempts (default: 3) before temporarily forcing manual password entry.
 - **Low-Light Compensation**: Automatic CLAHE (Contrast Limited Adaptive Histogram Equalization) for dark environments.
-- **Qt6 Control Panel & CLI**: Graphical management dashboard alongside a complete command-line interface.
-- **Bilingual Interface**: Built-in support for English and Spanish with automatic system locale detection.
+- **Qt6 Control Panel & CLI**: Graphical management dashboard with modern dark theme alongside a complete, color-coded interactive command-line interface.
+- **Bilingual Interface**: Built-in native support for English and Spanish with automatic system locale detection.
 
 ## Prerequisites
 
