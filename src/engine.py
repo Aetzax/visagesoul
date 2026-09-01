@@ -917,15 +917,29 @@ class GestureEngine:
 
 
 class BlinkEngine:
-    def __init__(self, model_path: str = "models/face_landmarker.task"):
+    def __init__(self, model_path: str = None):
         import mediapipe as mp
         from mediapipe.tasks import python
         from mediapipe.tasks.python import vision
+        from pathlib import Path
+        
         self.recognizer = None
         self.has_blinked = False
         
-        from pathlib import Path
-        if Path(model_path).is_file():
+        # Robust path resolution matching GestureEngine
+        self.model_path = Path(model_path) if model_path else Path(__file__).resolve().parent.parent / "models" / "face_landmarker.task"
+        if not self.model_path.is_file():
+            system_paths = [
+                Path("/usr/share/visagesoul/models/face_landmarker.task"),
+                Path("/opt/visagesoul/models/face_landmarker.task"),
+            ]
+            for p in system_paths:
+                if p.is_file():
+                    self.model_path = p
+                    break
+
+        if self.model_path.is_file():
+            model_path = str(self.model_path)
             try:
                 base_options = python.BaseOptions(model_asset_path=model_path)
                 options = vision.FaceLandmarkerOptions(
