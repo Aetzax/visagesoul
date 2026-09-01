@@ -470,8 +470,8 @@ class AntiSpoofEngine:
             self.landmarks_history.pop(0)
             self.eye_dynamics_history.pop(0)
 
-        # Require at least 8 frames of temporal history before allowing liveness
-        if len(self.landmarks_history) < 8:
+        # Require at least 6 frames of temporal history before allowing liveness
+        if len(self.landmarks_history) < 6:
             return False, 0.0, "Analizando perspectiva 3D y dinamica ocular..."
 
         ratios = [h[0] for h in self.landmarks_history]
@@ -481,12 +481,12 @@ class AntiSpoofEngine:
         self.last_metrics["rigidity_score"] = std_geom
         self.last_metrics["eye_std"] = std_eye
 
-        # In a 2D photo on a tripod or handheld:
-        # std_eye < 0.0003 indicates frozen 2D eyes, std_geom < 0.0060 indicates flat 2D perspective
-        if std_eye < 0.0003:
-            return False, std_geom, "Foto 2D estática detectada (Ojos congelados)"
-        if std_geom < 0.0060:
+        # In a 2D photo (tripod or handheld), eyes are frozen (std_eye < 0.0002) AND 3D geometry is flat (std_geom < 0.0050)
+        # Real humans always have living eye dynamics (std_eye >= 0.0006) or 3D head movement (std_geom >= 0.0060)
+        if std_eye < 0.0002 and std_geom < 0.0050:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
+        elif std_eye < 0.00008:
+            return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
 
         return True, 1.0, "Rostro 3D Vivo"
 
@@ -567,14 +567,15 @@ class AntiSpoofEngine:
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # Multi-frame consensus for Neural Anti-Spoofing:
-            # Requires persistent attack energy across buffer, preventing 1-frame boundary noise false positives
-            if len(self.real_scores_history) >= 3:
-                if avg_screen >= 0.28 or max_screen >= 0.48:
+            # Multi-frame persistent confirmation for Neural Anti-Spoofing:
+            # Requires persistent attack energy across buffer (both avg >= 0.35 and max >= 0.50),
+            # preventing 1-frame boundary noise or lighting transitions from false-flagging real users
+            if len(self.real_scores_history) >= 4:
+                if avg_screen >= 0.35 and max_screen >= 0.50:
                     self.session_tainted = True
                     self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
                     return False, avg_real, self.taint_reason
-                elif avg_print >= 0.32 or max_print >= 0.52:
+                elif avg_print >= 0.35 and max_print >= 0.50:
                     self.session_tainted = True
                     self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
                     return False, avg_real, self.taint_reason
