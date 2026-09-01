@@ -678,20 +678,27 @@ class MainWindow(QMainWindow):
         s_form = QFormLayout(sec_group)
 
         self.chk_thumbs_up = QCheckBox(tr("chk_thumbs_up"))
-        is_gesture_on = config.getboolean("security", "require_gesture", config.getboolean("security", "require_thumbs_up", False))
+        is_gesture_on = config.getboolean("security", "require_gesture", config.getboolean("security", "require_thumbs_up", True))
         self.chk_thumbs_up.setChecked(is_gesture_on)
         s_form.addRow("Doble Factor Gestual:", self.chk_thumbs_up)
+
+        self.lbl_gesture_warning = QLabel("⚠️ Advertencia: Desactivar el gesto reduce la protección contra ataques de fotos o vídeos en mano.")
+        self.lbl_gesture_warning.setStyleSheet("color: #ff9e64; font-size: 11px; font-style: italic;")
+        self.lbl_gesture_warning.setWordWrap(True)
+        self.lbl_gesture_warning.setVisible(not is_gesture_on)
+        s_form.addRow("", self.lbl_gesture_warning)
 
         self.combo_gesture_type = QComboBox()
         self.combo_gesture_type.addItem(tr("gesture_opt_thumb"), "thumb_up")
         self.combo_gesture_type.addItem(tr("gesture_opt_palm"), "open_palm")
         self.combo_gesture_type.addItem(tr("gesture_opt_both"), "both")
-        cur_gesture = config.get("security", "gesture_type", "thumb_up").lower()
+        cur_gesture = config.get("security", "gesture_type", "both").lower()
         idx = self.combo_gesture_type.findData(cur_gesture)
         if idx >= 0:
             self.combo_gesture_type.setCurrentIndex(idx)
         self.combo_gesture_type.setEnabled(is_gesture_on)
         self.chk_thumbs_up.toggled.connect(self.combo_gesture_type.setEnabled)
+        self.chk_thumbs_up.toggled.connect(lambda on: self.lbl_gesture_warning.setVisible(not on))
         s_form.addRow(tr("gesture_type_label"), self.combo_gesture_type)
 
         self.chk_auto_unlock = QCheckBox(tr("chk_auto_unlock"))

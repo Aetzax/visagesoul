@@ -23,28 +23,98 @@
 
 Powered by state-of-the-art neural vision models (**YuNet** for microsecond face detection and **SFace** for 128D cosine embeddings), paired with **MediaPipe 3D** for selectable 2FA gesture confirmation (👍 Thumbs Up, 🖐️ Open Palm, or 🔄 Both), **Multi-Layer Face Anti-Spoofing (FAS)**, and **CLAHE** low-light compensation.
 
-## Features
+---
 
-- **Session Auto-Unlock**: Seamlessly dismisses the lock screen via `systemd-logind` upon successful face match without requiring extra clicks.
-- **Bypass Welcome Page**: Hands-free direct login on boot for SDDM, GDM, and LightDM with immediate background biometric unlock.
-- **Selectable Gesture 2FA**: Choose your preferred confirmation gesture—**👍 Thumbs Up**, **🖐️ Open Palm**, or **🔄 Both**—to prevent accidental or unauthorized unlocks. Uses hybrid geometric landmark classifiers for distance and angle tolerance.
-- **Multi-Layer Anti-Spoofing (FAS)**:
-  - **2D Fourier Moire Detection**: Catches digital smartphone/tablet screens and LCD/OLED subpixel grids in the frequency spectrum.
-  - **Eye Micro-Gradient Dynamics**: Analyzes natural eye micro-movements and blink dynamics to reject static printed photos.
-  - **3D Non-Rigid Parallax**: Measures real-time depth perspective ratios between facial landmarks.
-- **Multiple Aspects per Profile**: Register multiple facial conditions per user (e.g., with glasses, without glasses, dark lighting, beard).
-- **Native C PAM Integration**: Compiled C security module (`pam_visagesoul.so`) with intelligent recursion detection for administrative tasks (`/proc` inspection). Supports KDE Screen Locker (`kscreenlocker`), SDDM, GDM, LightDM, `sudo`, and Polkit.
-- **Fail-Safe Fallback**: If the camera is busy, disconnected, or recognition times out, PAM immediately falls back to standard password authentication without locking you out.
-- **Lockout Protection**: Configurable limit for failed attempts (default: 3) before temporarily forcing manual password entry.
-- **Low-Light Compensation**: Automatic CLAHE (Contrast Limited Adaptive Histogram Equalization) for dark environments.
-- **Qt6 Control Panel & CLI**: Graphical management dashboard with modern dark theme alongside a complete, color-coded interactive command-line interface.
-- **Bilingual Interface**: Built-in native support for English and Spanish with automatic system locale detection.
+## 🛡️ Multi-Layered Anti-Spoofing & Security Architecture
 
-## Prerequisites
+VisageSoul incorporates a multi-tiered defense-in-depth security pipeline to defeat presentation attacks (photos, digital screens, replays, and handheld phones):
 
-- Linux system with `systemd` and PAM.
-- Working webcam (V4L2 compatible).
-- Dependencies: `gcc`, `make`, `pam` headers (`pam-devel` or `libpam0g-dev`), `python3` (3.10+), and `python-virtualenv`.
+1. **Deep Neural Anti-Spoofing (MiniFASNet V2)**:
+   - Deep convolutional feature analysis trained to distinguish real human skin textures from paper print grain, photo paper reflections, and OLED/IPS digital screen emission.
+   - Evaluates real face probability vs. print and screen attack likelihood on every frame.
+
+2. **3D Facial Geometry & Projective Parallax Analysis**:
+   - Computes non-linear aspect ratios across the eye-to-nose-to-mouth triangular plane ($req \ge 0.020$).
+   - Real 3D convex faces exhibit continuous out-of-plane parallax during natural postural sway, whereas flat 2D photographs (mounted on tripods or held in hand) behave as rigid affine planes with zero depth perspective.
+
+3. **Canonical Aligned Eye Dynamics & Micro-Saccades**:
+   - Performs canonical affine face rectification and measures high-frequency Sobel variance across the eye band ($std \ge 0.003, mad \ge 0.001$).
+   - Rejects frozen eyelids, static photo eyes, and printed portraits lacking natural micro-saccadic eye movement.
+
+4. **2D Fast Fourier Transform (FFT) Moiré & Glass Specular Reflection**:
+   - Evaluates the 2D frequency spectrum of the face crop to detect the artificial periodic sub-pixel grid (Moiré pattern) emitted by digital screens.
+   - Detects harsh specular glare and glass reflections typical of smartphone and tablet screens.
+
+5. **Biomechanical Decoupling (Independent Face & Hand Micro-Tremor)**:
+   - Tracks the normalized Euclidean distance vector $D(t) = \frac{\|\vec{P}_{\text{wrist}}(t) - \vec{P}_{\text{face}}(t)\|}{w_{\text{face}}}$ between the facial center and the hand wrist.
+   - **Handheld photo attacks**: The printed face and printed hand are fixed on the exact same piece of glass; shaking the phone moves both in identical synchrony ($\text{std\_dist} < 0.010$).
+   - **Real living humans**: The arm neuromuscular tremor (8–12 Hz) is physically independent of neck/head postural sway ($\text{std\_dist} \ge 0.020, \text{mad\_dist} \ge 0.012$), verifying independent biomechanical life.
+
+6. **Instant Attack Spike Lockout & Session Taint**:
+   - If an attack pattern or screen spike is detected in any frame ($p \ge 60\%$), the session is marked as permanently tainted (`session_tainted = True`). The attempt is immediately aborted and forces standard password entry.
+
+---
+
+## 🖐️ Gestures vs. Passive Face-Only Authentication
+
+### Recommended Default: 2FA Gesture Confirmation (Active by Default)
+By default, VisageSoul is configured with **Gesture 2FA enabled** (`require_gesture = true` with `gesture_type = both`: 👍 Thumb Up or 🖐️ Open Palm). This provides true multi-factor biometric authentication:
+- **Factor 1:** Face identity (128D cosine embedding) + 3D facial liveness.
+- **Factor 2:** Physical, intentional hand gesture confirmation with independent biomechanical motion.
+
+### Passive Mode: Face-Only Authentication
+If gesture validation is disabled (`require_gesture = false`):
+- VisageSoul operates in **passive face-only mode**, unlocking in ~0.3s simply by looking at the camera.
+- It continues to execute all 4 passive facial anti-spoofing layers: MiniFASNet V2 Neural FAS, 3D Facial Geometry Parallax, Eye Dynamics, and Screen Moiré analysis.
+
+> [!WARNING]
+> **Security Notice regarding Passive Mode:**  
+> Disabling gesture confirmation reduces the defense-in-depth protection against advanced physical presentation attacks (such as high-resolution full-size photos or video screens moved skillfully in front of the camera). Gesture 2FA confirmation is strongly recommended for high-security environments.
+
+---
+
+## ⚠️ Biometric Security Risks & Technical Limitations
+
+While VisageSoul provides state-of-the-art multi-factor biometric authentication on Linux, users should be aware of intrinsic biometric considerations:
+
+1. **Close Lookalikes & Identical Twins**: As with all 2D/RGB facial recognition systems, identical twins or close biological relatives with near-identical facial structures may produce elevated similarity scores.
+2. **High-Precision 3D Physical Replicas**: Complex, customized 3D medical-grade silicone masks with realistic convex facial features and eye openings can present challenges to standard RGB cameras lacking dedicated structured-light IR depth sensors.
+3. **Extreme Low-Light Conditions**: In pitch-black rooms, standard RGB webcams may struggle with contrast. VisageSoul incorporates CLAHE adaptive luminance boost, but sufficient ambient light (or screen brightness) is required for optical feature extraction.
+4. **Camera Resolution & Dirt**: Webcams with resolutions lower than 720p or dirty lenses can degrade frequency-based Moiré detection.
+5. **Fail-Safe Rate Limiting**: If biometric verification fails or times out after a configurable limit (default: 3 attempts within 300s), VisageSoul temporarily locks out camera authentication and forces standard Unix password authentication to prevent brute-force attacks.
+
+---
+
+## ⚙️ Customizability via Graphical Interface (GUI) & Config
+
+All verification rules, thresholds, and timeouts are fully customizable without modifying code:
+
+- **Similarity Threshold (`0.50` – `0.95`)**: Adjust matching strictness (default: `0.70`).
+- **Verification Timeout (`1.0s` – `15.0s`)**: Adjust camera scan window (default: `4.5s`).
+- **Consecutive Consensus Window**: Multi-frame temporal consensus (8 consecutive matched frames required for authorization).
+- **Max Failed Attempts (`1` – `10`)**: Rate-limiting lockout threshold (default: `3`).
+- **Gesture Selection**: Choose between 👍 Pulgar Arriba, 🖐️ Mano Abierta, or 🔄 Ambos (Cualquiera).
+- **Audio Feedback**: Pleasant system chime on successful login with customizable volume.
+- **Low-Light Boost**: Automatic CLAHE contrast enhancement.
+
+You can adjust these settings visually in **`visagesoul gui`** or directly in `/etc/visagesoul/config.ini`:
+
+```ini
+[security]
+threshold = 0.70
+timeout = 4.5
+min_face_size = 60
+liveness_check = true
+require_gesture = true
+gesture_type = both
+auto_unlock = true
+sound_feedback = true
+sound_volume = 35
+max_attempts = 3
+attempts_window = 300
+```
+
+---
 
 ## Installation
 
@@ -57,10 +127,12 @@ sudo ./VisageSinstall.sh
 ```
 
 The installer will:
-1. Compile the native C PAM module (`pam_visagesoul.so`) into your system security libraries.
-2. Download the required ONNX and MediaPipe neural models.
+1. Compile the native C PAM module (`pam_visagesoul.so`) into `/usr/lib/security/`.
+2. Download and verify the neural models (YuNet, SFace, MiniFASNet V2, MediaPipe Gesture).
 3. Set up the Python virtual environment and system binaries in `/opt/visagesoul/`.
-4. Install desktop launchers and icons.
+4. Configure desktop launchers and icons for KDE Plasma and desktop environments.
+
+---
 
 ## Quick Start
 
@@ -76,7 +148,7 @@ visagesoul enroll
 visagesoul enroll --label "Glasses"
 ```
 
-You can also use the graphical configurator:
+Or use the graphical control panel:
 
 ```bash
 visagesoul gui
@@ -100,18 +172,20 @@ sudo visagesoul enable polkit-1
 
 ### 3. Test Recognition
 
-Test your camera feed, face matching score, and gesture tracking in real time:
+Test your camera feed, face matching score, 3D liveness, and gesture tracking in real time:
 
 ```bash
 visagesoul test
 ```
+
+---
 
 ## CLI Reference
 
 | Command | Description |
 | :--- | :--- |
 | `visagesoul enroll [user] [--label "..."]` | Enroll a new face profile or aspect. |
-| `visagesoul test [user]` | Run real-time camera and gesture diagnostics. |
+| `visagesoul test [user]` | Run real-time camera, liveness, and gesture diagnostics. |
 | `visagesoul status` | Display system status, camera, and active PAM rules. |
 | `visagesoul list` | List all enrolled users and their registered aspects. |
 | `visagesoul remove <user>` | Delete a user's face profile. |
@@ -120,43 +194,18 @@ visagesoul test
 | `visagesoul doctor` | Run hardware, library, and permissions diagnostics. |
 | `visagesoul gui` | Open the Qt6 graphical control panel. |
 
-## Configuration
-
-Settings are stored in `/etc/visagesoul/config.ini` (system-wide) with per-user overrides supported in `~/.config/visagesoul/config.ini`.
-
-```ini
-[camera]
-device = /dev/video0
-width = 1280
-height = 720
-fourcc = MJPG
-fps = 30
-warmup_frames = 5
-low_light_boost = true
-
-[security]
-threshold = 0.70
-timeout = 4.0
-require_thumbs_up = false
-auto_unlock = true
-sound_feedback = true
-sound_volume = 30
-max_attempts = 3
-attempts_window = 300
-
-[pam]
-notify = true
-message = Waiting for biometrics...
-```
+---
 
 ## Architecture & Security
 
 - **Process Isolation**: The PAM module (`src/pam_visagesoul.c`) forks verification into a separate process with strict return code handling (`PAM_SUCCESS`, `PAM_AUTHINFO_UNAVAIL`, `PAM_IGNORE`).
-- **Administrative Recursion Bypass**: Internal configuration commands (such as `visagesoul enable`, `visagesoul disable`, `visagesoul remove`, and the Qt GUI) automatically inspect the caller process tree (`/proc/$PPID/cmdline`). Administrative management tasks bypass the camera (`PAM_IGNORE`) and require standard password verification, preventing hardware resource locks and redundant scans.
-- **Fail-Safe Password Fallback**: When recognition times out or biometric matching fails, the module immediately returns `PAM_AUTHINFO_UNAVAIL`, allowing Linux PAM to fall back cleanly to standard password entry without authentication deadlocks.
+- **Administrative Recursion Bypass**: Internal configuration commands (`visagesoul enable`, `visagesoul disable`, `visagesoul remove`, and the GUI) inspect the caller process tree (`/proc/$PPID/cmdline`). Administrative tasks bypass the camera (`PAM_IGNORE`) and require standard password verification.
+- **Fail-Safe Password Fallback**: When recognition times out or biometric matching fails, the module immediately returns `PAM_AUTHINFO_UNAVAIL`, allowing Linux PAM to fall back cleanly to password entry without authentication deadlocks.
 - **Input Sanitization**: Usernames are validated against path traversal and shell injection patterns before any filesystem operations.
 - **Biometric Templates**: Facial embeddings are stored as 128-float cosine vectors. Raw images are discarded immediately after feature extraction.
 - **Runtime State**: Attempt counters and rate-limiting data are stored in isolated runtime directories to prevent symlink attacks.
+
+---
 
 ## Uninstallation
 
@@ -166,11 +215,15 @@ To cleanly remove VisageSoul and restore default PAM configurations:
 sudo ./VisageSuninstall.sh
 ```
 
+---
+
 ## Support & Donations
 
-If you find VisageSoul useful and want to support ongoing development, consider buying a coffee or contributing:
+If you find VisageSoul useful and want to support ongoing development:
 
 - **PayPal:** [paypal.me/aetzax1](https://paypal.me/aetzax1)
+
+---
 
 ## License
 
