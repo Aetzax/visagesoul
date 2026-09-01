@@ -400,7 +400,7 @@ class AntiSpoofEngine:
         A 2D photo has constant distance ratios even under hand tremor / shaking.
         """
         if primary_face is None or len(primary_face) < 14:
-            return True, 1.0, "OK"
+            return False, 0.0, "Sin rostro"
 
         re = primary_face[4:6]
         le = primary_face[6:8]
@@ -419,13 +419,16 @@ class AntiSpoofEngine:
         if len(self.landmarks_history) > 10:
             self.landmarks_history.pop(0)
 
-        if len(self.landmarks_history) >= 4:
-            yaws = [h[0] for h in self.landmarks_history]
-            tris = [h[1] for h in self.landmarks_history]
-            rigidity_score = float(np.std(yaws) + np.std(tris))
-            # If 2D affine perspective is completely frozen (photo with or without hand tremor)
-            if rigidity_score < 0.0004:
-                return False, rigidity_score, "Foto 2D estática detectada (Sin perspectiva 3D)"
+        # Require at least 4 frames of temporal history before allowing liveness
+        if len(self.landmarks_history) < 4:
+            return False, 0.0, "Analizando perspectiva 3D..."
+
+        yaws = [h[0] for h in self.landmarks_history]
+        tris = [h[1] for h in self.landmarks_history]
+        rigidity_score = float(np.std(yaws) + np.std(tris))
+        # If 2D affine perspective is completely frozen (photo with or without hand tremor)
+        if rigidity_score < 0.0004:
+            return False, rigidity_score, "Foto 2D estática detectada (Sin perspectiva 3D)"
 
         return True, 1.0, "Rostro 3D Vivo"
 

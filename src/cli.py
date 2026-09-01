@@ -206,6 +206,7 @@ def cmd_test(args):
 
     face_history = []
     liveness_check = config.getboolean("security", "liveness_check", True)
+    consecutive_test_matches = 0
 
     while True:
         ret, frame = cap.read()
@@ -242,26 +243,41 @@ def cmd_test(args):
                 pct = int(score * 100)
 
                 if is_match and not liveness_ok:
+                    consecutive_test_matches = 0
                     box_color = (0, 140, 255)
                     bar_color = (0, 70, 180)
                     score_text = f"[!] ALERTA: {liveness_msg}"
                 elif is_match and liveness_ok:
                     if require_gesture:
                         if gesture_valid:
-                            box_color = (0, 255, 0)
-                            bar_color = (20, 120, 20)
-                            clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
-                            score_text = f"[OK] AUTORIZADO: {username} ({pct}%) + {clean_gesture_name}"
+                            consecutive_test_matches += 1
+                            if consecutive_test_matches >= 3:
+                                box_color = (0, 255, 0)
+                                bar_color = (20, 120, 20)
+                                clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
+                                score_text = f"[OK] AUTORIZADO: {username} ({pct}%) + {clean_gesture_name}"
+                            else:
+                                box_color = (0, 255, 200)
+                                bar_color = (0, 100, 140)
+                                score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/3)..."
                         else:
+                            consecutive_test_matches = max(0, consecutive_test_matches - 1)
                             box_color = (0, 200, 255)
                             bar_color = (140, 100, 0)
                             hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta" if gesture_mode == "open_palm" else "Pulgar arriba")
                             score_text = f"[OK] Rostro 3D Vivo ({pct}%) -> Muestra {hint}"
                     else:
-                        box_color = (0, 255, 0)
-                        bar_color = (20, 120, 20)
-                        score_text = f"[OK] AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
+                        consecutive_test_matches += 1
+                        if consecutive_test_matches >= 3:
+                            box_color = (0, 255, 0)
+                            bar_color = (20, 120, 20)
+                            score_text = f"[OK] AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
+                        else:
+                            box_color = (0, 255, 200)
+                            bar_color = (0, 100, 140)
+                            score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/3)..."
                 else:
+                    consecutive_test_matches = 0
                     box_color = (0, 0, 255)
                     bar_color = (20, 20, 120)
                     score_text = f"[X] NO COINCIDE ({pct}% / req {int(threshold*100)}%)"
