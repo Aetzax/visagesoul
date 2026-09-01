@@ -804,40 +804,50 @@ class GestureEngine:
         self,
         frame_bgr: np.ndarray,
         mode: str = "thumb_up",
-        min_score: float = 0.35,
+        min_score: float = 0.60,
         primary_face: Optional[np.ndarray] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
         Validates gesture against requested mode: 'thumb_up', 'open_palm', or 'both'/'any'.
-        Also verifies non-rigid hand-to-face dynamic vector if primary_face is provided.
+        Also verifies non-rigid hand-to-face dynamic vector and physical separation if primary_face is provided.
         Returns (is_valid, detected_gesture_name).
         """
         gesture, score, is_geom_thumb, is_geom_palm, wrist_px = self.detect_gesture(frame_bgr)
-        thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
-        palm_ok = (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
+        thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or (is_geom_thumb and score >= 0.40)
+        palm_ok = (gesture == "Open_Palm" and score >= min_score) or (is_geom_palm and score >= 0.40)
 
-        # Verify dynamic relative micro-movement between hand and face (defeats pre-printed photo hand attacks)
+        if not (thumb_ok or palm_ok):
+            return False, None
+
+        # Verify physical hand-face separation and independent biomechanics
         if primary_face is not None and wrist_px is not None and len(primary_face) >= 4:
             fc = (primary_face[0] + primary_face[2] / 2.0, primary_face[1] + primary_face[3] / 2.0)
             face_size = max(1.0, float(max(primary_face[2], primary_face[3])))
             
             # Relative Euclidean distance normalized by face size
             rel_dist = float(np.sqrt((wrist_px[0] - fc[0])**2 + (wrist_px[1] - fc[1])**2) / face_size)
+            
+            # Reject hand gripping or touching the phone/photo frame (must be physically separated from face)
+            if rel_dist < 0.85:
+                return False, "Mano en borde de pantalla (Sujeción de móvil detectada)"
+
             self.hand_face_history.append((rel_dist, 0.0))
             if len(self.hand_face_history) > 16:
                 self.hand_face_history.pop(0)
 
-            if len(self.hand_face_history) >= 4:
-                dists = [h[0] for h in self.hand_face_history]
-                std_dist = float(np.std(dists))
+            # Warmup: Require at least 4 frames of tracking history before approving
+            if len(self.hand_face_history) < 4:
+                return False, "Calibrando gesto..."
 
-                dist_diffs = [abs(dists[i] - dists[i-1]) for i in range(1, len(dists))]
-                mad_dist = float(np.mean(dist_diffs[-3:])) if len(dist_diffs) >= 3 else 0.0
+            dists = [h[0] for h in self.hand_face_history]
+            std_dist = float(np.std(dists))
+            dist_diffs = [abs(dists[i] - dists[i-1]) for i in range(1, len(dists))]
+            mad_dist = float(np.mean(dist_diffs[-3:])) if len(dist_diffs) >= 3 else 0.0
 
-                # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0040, mad_dist < 0.0018)
-                # In a living human holding their hand naturally, std_dist >= 0.0120 and mad_dist >= 0.0040
-                if std_dist < 0.0080 or mad_dist < 0.0035:
-                    return False, "Gesto estático preimpreso detectado"
+            # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0040, mad_dist < 0.0018)
+            # In a living human holding their hand naturally, std_dist >= 0.0120 and mad_dist >= 0.0040
+            if std_dist < 0.0080 or mad_dist < 0.0035:
+                return False, "Gesto estático preimpreso detectado"
 
         mode_clean = str(mode).lower().strip()
         if mode_clean in ("thumb_up", "thumbs_up", "pulgar", "pulgar_arriba"):

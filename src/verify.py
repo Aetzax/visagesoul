@@ -94,8 +94,8 @@ def reset_attempts(username: str):
 
 
 def verify_user(username: str, timeout: float = None, threshold: float = None, device_path: str = None, debug: bool = False, require_thumbs_up: bool = None, gesture_type: str = None) -> int:
-    is_debug = debug or config.getboolean("pam", "debug", False)
-    log_file = "/tmp/visagesoul_verify.log" if is_debug else None
+    is_debug = True
+    log_file = "/tmp/visagesoul_verify.log"
     logger = setup_logger("visagesoul-verify", debug=is_debug, log_file=log_file)
 
     if timeout is None:
