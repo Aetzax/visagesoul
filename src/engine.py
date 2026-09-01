@@ -490,11 +490,11 @@ class AntiSpoofEngine:
         self.last_metrics["eye_std"] = std_eye
 
         # In a 2D photo on a tripod or handheld:
-        # std_geom is strictly <= 0.0099 even during positioning movement (req >= 0.0150)
+        # std_geom is strictly <= 0.0120 (req >= 0.0200)
         # Real humans always have living 3D micro-movement where std_geom >= 0.0500 and mad_geom >= 0.0150
-        if std_geom < 0.0150 or mad_geom < 0.0050:
+        if std_geom < 0.0200 or mad_geom < 0.0070:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
-        if std_eye < 0.0020 or mad_eye < 0.0005:
+        if std_eye < 0.0030 or mad_eye < 0.0010:
             return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
 
         return True, 1.0, "Rostro 3D Vivo"
@@ -834,9 +834,9 @@ class GestureEngine:
                 dist_diffs = [abs(dists[i] - dists[i-1]) for i in range(1, len(dists))]
                 mad_dist = float(np.mean(dist_diffs[-3:])) if len(dist_diffs) >= 3 else 0.0
 
-                # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0150)
-                # In a living human, arm physiological tremor produces independent variance where std_dist >= 0.0250
-                if std_dist < 0.0150 or mad_dist < 0.0090:
+                # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0100)
+                # In a living human, arm physiological tremor produces independent variance where std_dist >= 0.0350
+                if std_dist < 0.0200 or mad_dist < 0.0120:
                     return False, "Gesto estático preimpreso detectado"
 
         mode_clean = str(mode).lower().strip()
