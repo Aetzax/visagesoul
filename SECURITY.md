@@ -1,14 +1,5 @@
 # Security Policy
 
-## Supported Versions
-
-At this time, only the latest commit on the `main` branch is actively supported with security updates. 
-
-| Version | Supported          |
-| ------- | ------------------ |
-| `main`  | :white_check_mark: |
-| `< 1.2` | :x:                |
-
 ## Biometric Scope and Known Limitations
 
 VisageSoul is a multi-factor Face Anti-Spoofing (FAS) PAM module designed for generic RGB consumer webcams. Before reporting a vulnerability, please review our known hardware and biological limitations. **The following scenarios are considered known limitations and not valid security vulnerabilities:**
