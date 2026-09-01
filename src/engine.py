@@ -434,7 +434,7 @@ class AntiSpoofEngine:
                 return False, 0.0, "Rostro demasiado pequeño"
 
             crop_80 = cv2.resize(crop, (80, 80))
-            blob = cv2.dnn.blobFromImage(crop_80, scalefactor=1.0/255.0, size=(80, 80), mean=(0, 0, 0), swapRB=False)
+            blob = cv2.dnn.blobFromImage(crop_80, scalefactor=1.0, size=(80, 80), mean=(0, 0, 0), swapRB=True)
             self.net.setInput(blob)
             out = self.net.forward()
             exp_out = np.exp(out - np.max(out))
@@ -445,9 +445,9 @@ class AntiSpoofEngine:
             pred_label = int(np.argmax(probs))
 
             # Flag as attack only when the neural network explicitly classifies as spoof
-            if pred_label == 2 and p_screen >= 0.70:
+            if pred_label == 2 and p_screen >= 0.65:
                 return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
-            elif pred_label == 0 and p_print >= 0.70:
+            elif pred_label == 0 and p_print >= 0.65:
                 return False, p_real, f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
 
             return True, p_real, f"Rostro real validado por IA ({p_real*100:.0f}%)"
