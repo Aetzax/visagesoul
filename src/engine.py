@@ -490,9 +490,9 @@ class AntiSpoofEngine:
         self.last_metrics["eye_std"] = std_eye
 
         # In a 2D photo on a tripod or handheld:
-        # std_geom < 0.0080 or mad_geom < 0.0030 (consecutive frame-to-frame delta is near 0 in a photo)
-        # std_eye < 0.0020 or mad_eye < 0.0005 (eyes do not twitch or blink in a photo)
-        if std_geom < 0.0080 or mad_geom < 0.0030:
+        # std_geom is strictly <= 0.0099 even during positioning movement (req >= 0.0150)
+        # Real humans always have living 3D micro-movement where std_geom >= 0.0500 and mad_geom >= 0.0150
+        if std_geom < 0.0150 or mad_geom < 0.0050:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
         if std_eye < 0.0020 or mad_eye < 0.0005:
             return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"

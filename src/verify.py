@@ -163,7 +163,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
         start_time = time.time()
         consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 5
+        REQUIRED_CONSECUTIVE_MATCHES = 6
         frame_idx = 0
 
         while (time.time() - start_time) < timeout:
