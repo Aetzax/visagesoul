@@ -194,16 +194,20 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                         gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
                         logger.debug(f"Face matched + Liveness OK. Gesture ({gesture_type}) detected: {gesture_ok} ({g_name})")
                         if gesture_ok:
-                            logger.info(f"Verification successful for {username} (Face + 3D Live + {g_name})! (Score: {score:.3f})")
-                            reset_attempts(username)
-                            if sound_feedback:
-                                play_chime("success")
-                            if auto_unlock:
-                                try:
-                                    subprocess.Popen(["loginctl", "unlock-session"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                                except Exception:
-                                    pass
-                            return 0
+                            consecutive_matches += 1
+                            if consecutive_matches >= REQUIRED_CONSECUTIVE_MATCHES:
+                                logger.info(f"Verification successful for {username} (Face + 3D Live + {g_name})! (Score: {score:.3f})")
+                                reset_attempts(username)
+                                if sound_feedback:
+                                    play_chime("success")
+                                if auto_unlock:
+                                    try:
+                                        subprocess.Popen(["loginctl", "unlock-session"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                    except Exception:
+                                        pass
+                                return 0
+                        else:
+                            consecutive_matches = max(0, consecutive_matches - 1)
                     else:
                         consecutive_matches += 1
                         if consecutive_matches >= REQUIRED_CONSECUTIVE_MATCHES:

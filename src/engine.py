@@ -367,8 +367,9 @@ class AntiSpoofEngine:
             models_dir = config.get("paths", "models_dir")
         self.models_dir = Path(models_dir)
         self.net = None
-        self.face_history: List[np.ndarray] = []
-        self.eye_contrast_history: List[float] = []
+        self.real_scores_history: List[float] = []
+        self.screen_scores_history: List[float] = []
+        self.print_scores_history: List[float] = []
 
         # Find model file in configured dir or local fallback
         candidates = [
@@ -387,12 +388,13 @@ class AntiSpoofEngine:
                     logger.warning(f"Failed to load MiniFASNet model from {p}: {e}")
 
     def reset(self):
-        self.face_history.clear()
-        self.eye_contrast_history.clear()
+        self.real_scores_history.clear()
+        self.screen_scores_history.clear()
+        self.print_scores_history.clear()
 
     def infer_neural_fas(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Runs deep neural network inference on face crop using MiniFASNet V2.
+        Runs deep neural network inference on face crop using MiniFASNet V2 with rolling temporal consensus.
         Returns (is_live, real_probability, classification_reason).
         """
         if self.net is None or primary_face is None:
@@ -442,15 +444,29 @@ class AntiSpoofEngine:
             p_print = float(probs[0])
             p_real = float(probs[1])   # Class index 1 is Real Face
             p_screen = float(probs[2])  # Class index 2 is Screen Attack
-            pred_label = int(np.argmax(probs))
 
-            # Flag as attack only when the neural network explicitly classifies as spoof
-            if pred_label == 2 and p_screen >= 0.65:
-                return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
-            elif pred_label == 0 and p_print >= 0.65:
-                return False, p_real, f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
+            # Track rolling history (window of 5 frames)
+            self.real_scores_history.append(p_real)
+            self.screen_scores_history.append(p_screen)
+            self.print_scores_history.append(p_print)
+            if len(self.real_scores_history) > 6:
+                self.real_scores_history.pop(0)
+                self.screen_scores_history.pop(0)
+                self.print_scores_history.pop(0)
 
-            return True, p_real, f"Rostro real validado por IA ({p_real*100:.0f}%)"
+            max_screen = max(self.screen_scores_history)
+            avg_screen = sum(self.screen_scores_history) / len(self.screen_scores_history)
+            max_print = max(self.print_scores_history)
+            avg_print = sum(self.print_scores_history) / len(self.print_scores_history)
+            avg_real = sum(self.real_scores_history) / len(self.real_scores_history)
+
+            # If any significant screen energy exists in the rolling buffer
+            if max_screen >= 0.55 or avg_screen >= 0.35:
+                return False, avg_real, f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
+            elif max_print >= 0.55 or avg_print >= 0.35:
+                return False, avg_real, f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
+
+            return True, avg_real, f"Rostro real validado por IA ({avg_real*100:.0f}%)"
         except Exception as e:
             logger.debug(f"Neural FAS error: {e}")
             return True, 0.5, str(e)
