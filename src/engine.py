@@ -420,12 +420,16 @@ class AntiSpoofEngine:
             out = self.net.forward()
             exp_out = np.exp(out - np.max(out))
             probs = (exp_out / np.sum(exp_out))[0]
-            p_real = float(probs[0])
-            p_print = float(probs[1])
-            p_screen = float(probs[2])
+            p_print = float(probs[0])
+            p_real = float(probs[1])  # In MiniFASNet V2, class index 1 is REAL LIVE FACE
+            p_screen = float(probs[2]) # Class index 2 is SCREEN REPLAY ATTACK
+            pred_label = int(np.argmax(probs))
 
-            # If model predicts spoof (screen or print attack)
-            if p_real < 0.60 or p_screen >= 0.40 or p_print >= 0.40:
+            # In Silent-Face-Anti-Spoofing:
+            # Label 1 = Real Face, Label 0 = Print Attack, Label 2 = Screen Attack
+            is_real = (pred_label == 1) and (p_real >= 0.50)
+
+            if not is_real:
                 if p_screen >= p_print:
                     return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
                 else:
