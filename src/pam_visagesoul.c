@@ -90,9 +90,60 @@ static const char *get_verify_binary_path() {
 }
 
 #include <pwd.h>
+#include <time.h>
 
-static void get_config_pam_settings(const char *username, int *out_notify, char *out_message, size_t max_len) {
+static void reset_user_attempts_file(const char *username) {
+    if (!is_valid_username(username)) return;
+    char path[512];
+    snprintf(path, sizeof(path), "/run/visagesoul/attempts_%s.json", username);
+    unlink(path);
+    snprintf(path, sizeof(path), "/tmp/visagesoul_runtime/attempts_%s.json", username);
+    unlink(path);
+}
+
+static int is_attempt_limit_exceeded(const char *username, int max_attempts, int window_seconds) {
+    if (!is_valid_username(username) || max_attempts <= 0) return 0;
+    char path[512];
+    snprintf(path, sizeof(path), "/run/visagesoul/attempts_%s.json", username);
+    FILE *fp = fopen(path, "r");
+    if (!fp) {
+        snprintf(path, sizeof(path), "/tmp/visagesoul_runtime/attempts_%s.json", username);
+        fp = fopen(path, "r");
+    }
+    if (!fp) return 0;
+
+    char buffer[4096];
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, fp);
+    fclose(fp);
+    buffer[n] = '\0';
+
+    time_t now = time(NULL);
+    int count = 0;
+    char *ptr = strstr(buffer, "\"timestamps\"");
+    if (ptr) {
+        ptr = strchr(ptr, '[');
+        if (ptr) {
+            ptr++;
+            while (*ptr && *ptr != ']') {
+                while (*ptr == ' ' || *ptr == ',' || *ptr == '\n' || *ptr == '\r') ptr++;
+                if (*ptr >= '0' && *ptr <= '9') {
+                    double ts = strtod(ptr, &ptr);
+                    if ((now - (time_t)ts) < window_seconds) {
+                        count++;
+                    }
+                } else {
+                    ptr++;
+                }
+            }
+        }
+    }
+    return (count >= max_attempts);
+}
+
+static void get_config_pam_settings(const char *username, int *out_notify, char *out_message, size_t max_len, int *out_max_attempts, int *out_window) {
     *out_notify = 1;
+    *out_max_attempts = 3;
+    *out_window = 300;
     const char *lang_env = getenv("LANG");
     if (lang_env && strncmp(lang_env, "en", 2) == 0) {
         strncpy(out_message, "Waiting for biometrics...", max_len - 1);
@@ -123,6 +174,7 @@ static void get_config_pam_settings(const char *username, int *out_notify, char 
 
         char line[256];
         int in_pam_section = 0;
+        int in_security_section = 0;
         while (fgets(line, sizeof(line), fp)) {
             char *trimmed = line;
             while (*trimmed == ' ' || *trimmed == '\t') trimmed++;
@@ -130,9 +182,15 @@ static void get_config_pam_settings(const char *username, int *out_notify, char 
 
             if (*trimmed == '[' && strstr(trimmed, "pam")) {
                 in_pam_section = 1;
+                in_security_section = 0;
+                continue;
+            } else if (*trimmed == '[' && strstr(trimmed, "security")) {
+                in_pam_section = 0;
+                in_security_section = 1;
                 continue;
             } else if (*trimmed == '[') {
                 in_pam_section = 0;
+                in_security_section = 0;
             }
 
             if (in_pam_section) {
@@ -160,6 +218,14 @@ static void get_config_pam_settings(const char *username, int *out_notify, char 
                         }
                     }
                 }
+            } else if (in_security_section) {
+                if (strncmp(trimmed, "max_attempts", 12) == 0) {
+                    char *val = strchr(trimmed, '=');
+                    if (val) *out_max_attempts = atoi(val + 1);
+                } else if (strncmp(trimmed, "attempts_window", 15) == 0) {
+                    char *val = strchr(trimmed, '=');
+                    if (val) *out_window = atoi(val + 1);
+                }
             }
         }
         fclose(fp);
@@ -173,24 +239,21 @@ static int is_visagesoul_internal_call(void) {
         return 1;
     }
 
-    /* Check parent and current process command lines to prevent triggering biometrics inside GUI */
-    char path[64];
-    pid_t pids[2] = { getppid(), getpid() };
-    for (int p = 0; p < 2; p++) {
-        snprintf(path, sizeof(path), "/proc/%d/cmdline", pids[p]);
-        FILE *fp = fopen(path, "r");
-        if (fp) {
-            char buf[512];
-            size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
-            fclose(fp);
-            if (n > 0) {
-                buf[n] = '\0';
-                for (size_t i = 0; i < n; i++) {
-                    if (buf[i] == '\0') buf[i] = ' ';
-                }
-                if (strstr(buf, "visagesoul") || strstr(buf, "gui.py")) {
-                    return 1;
-                }
+    pid_t ppid = getppid();
+    char stat_path[64];
+    snprintf(stat_path, sizeof(stat_path), "/proc/%d/cmdline", ppid);
+    int fd = open(stat_path, O_RDONLY);
+    if (fd >= 0) {
+        char buf[512];
+        ssize_t len = read(fd, buf, sizeof(buf) - 1);
+        close(fd);
+        if (len > 0) {
+            buf[len] = '\0';
+            for (ssize_t i = 0; i < len; i++) {
+                if (buf[i] == '\0') buf[i] = ' ';
+            }
+            if (strstr(buf, "visagesoul") || strstr(buf, "gui.py")) {
+                return 1;
             }
         }
     }
@@ -213,8 +276,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
 
     int cfg_notify = 1;
+    int max_attempts = 3;
+    int window_seconds = 300;
     char pam_message[256];
-    get_config_pam_settings(username, &cfg_notify, pam_message, sizeof(pam_message));
+    get_config_pam_settings(username, &cfg_notify, pam_message, sizeof(pam_message), &max_attempts, &window_seconds);
     int notify = cfg_notify;
 
     for (int i = 0; i < argc; i++) {
@@ -232,6 +297,15 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if (!profile_exists(username)) {
         if (debug) syslog(LOG_DEBUG, "User '%s' is not enrolled in VisageSoul. Skipping.", username);
         return PAM_IGNORE;
+    }
+
+    /* Check if user exceeded max attempts BEFORE sending biometrics notification */
+    if (is_attempt_limit_exceeded(username, max_attempts, window_seconds)) {
+        if (debug) syslog(LOG_NOTICE, "User '%s' exceeded max failed attempts (%d). Forcing password.", username, max_attempts);
+        if (notify) {
+            send_pam_info(pamh, "Límite de intentos superado. Introduce tu contraseña.");
+        }
+        return PAM_AUTHINFO_UNAVAIL;
     }
 
     const char *verify_bin = get_verify_binary_path();
@@ -287,6 +361,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
         if (exit_code == 0) {
             if (debug) syslog(LOG_INFO, "User '%s' authenticated successfully via biometric face match.", username);
+            reset_user_attempts_file(username);
             return PAM_SUCCESS;
         } else if (exit_code == 3) {
             /* Max failed attempts exceeded -> cleanly fall back to password entry */
@@ -305,7 +380,11 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 }
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv) {
-    (void)pamh; (void)flags; (void)argc; (void)argv;
+    (void)flags; (void)argc; (void)argv;
+    const char *username = NULL;
+    if (pam_get_user(pamh, &username, NULL) == PAM_SUCCESS && username) {
+        reset_user_attempts_file(username);
+    }
     return PAM_SUCCESS;
 }
 
@@ -315,7 +394,11 @@ PAM_EXTERN int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const c
 }
 
 PAM_EXTERN int pam_sm_open_session(pam_handle_t *pamh, int flags, int argc, const char **argv) {
-    (void)pamh; (void)flags; (void)argc; (void)argv;
+    (void)flags; (void)argc; (void)argv;
+    const char *username = NULL;
+    if (pam_get_user(pamh, &username, NULL) == PAM_SUCCESS && username) {
+        reset_user_attempts_file(username);
+    }
     return PAM_SUCCESS;
 }
 
