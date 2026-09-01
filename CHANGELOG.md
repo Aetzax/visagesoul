@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2] - 2026-09-01
+
+### Added
+- **Blink Challenge (Active Liveness)**: Integrated `MediaPipe Face Landmarker` to require an explicit, physical eyelid closure (blink) before granting authentication, rendering static photo spoofing mathematically impossible.
+- **Enhanced Temporal Security**: Increased `REQUIRED_CONSECUTIVE_MATCHES` from 5 to 7 frames to require sustained proof of liveness and identity, preventing split-second presentation attacks.
+
+### Changed
+- **Liveness UX Overhaul**: Reverted the 3D Projective Invariance (`std_geom`) back to its maximum military-grade strictness (`0.0120`), but changed the rejection strings to active liveness prompts (*"Mueve levemente la cabeza"*). This eliminates the vulnerability to wobbled photos while removing the frustration of false-positive error messages.
+- **Tuned Taint Lock**: Restored the `MiniFASNet` permanent session lockout for screen/print detection, but raised the instant-lock threshold from `0.60` to `0.85` to prevent false lockouts from temporary lighting artifacts.
+
 ## [1.2.1] - 2026-09-01
 
 ### Fixed

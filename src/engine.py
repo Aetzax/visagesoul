@@ -492,10 +492,10 @@ class AntiSpoofEngine:
         # In a 2D photo on a tripod or handheld:
         # std_geom is strictly <= 0.0099 even during positioning movement (req >= 0.0120)
         # Real humans sitting naturally have living 3D micro-movement where std_geom >= 0.0180
-        if std_geom < 0.0050 or mad_geom < 0.0008:
-            return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
-        if std_eye < 0.0002 or mad_eye < 0.0001:
-            return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
+        if std_geom < 0.0120 or mad_geom < 0.0025:
+            return False, std_geom, "Mueve levemente la cabeza (Validación 3D)"
+        if std_eye < 0.0005 or mad_eye < 0.0002:
+            return False, std_eye, "Parpadea o mueve los ojos (Liveness)"
 
         return True, 1.0, "Rostro 3D Vivo"
 
@@ -575,24 +575,25 @@ class AntiSpoofEngine:
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # 1. Instant Spike Taint Lock (Screen or Print attack spike >= 0.60 on any frame)
-            if p_screen >= 0.60:
-                # self.session_tainted = True
+            # 1. Instant Spike Taint Lock (Screen or Print attack spike >= 0.95 on any frame)
+            # Increased to 0.95 to prevent false locks from bad lighting, while keeping the security mechanism intact against clear attacks
+            if p_screen >= 0.85:
+                self.session_tainted = True
                 self.taint_reason = f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
                 return False, avg_real, self.taint_reason
-            elif p_print >= 0.60:
-                # self.session_tainted = True
+            elif p_print >= 0.85:
+                self.session_tainted = True
                 self.taint_reason = f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
                 return False, avg_real, self.taint_reason
 
             # 2. Multi-frame persistent confirmation for Neural Anti-Spoofing:
             if len(self.real_scores_history) >= 4:
                 if avg_screen >= 0.30 and max_screen >= 0.45:
-                    # self.session_tainted = True
+                    self.session_tainted = True
                     self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
                     return False, avg_real, self.taint_reason
                 elif avg_print >= 0.30 and max_print >= 0.45:
-                    # self.session_tainted = True
+                    self.session_tainted = True
                     self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
                     return False, avg_real, self.taint_reason
 
@@ -613,14 +614,16 @@ class AntiSpoofEngine:
 
             gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
             
-            # Specular glare check (glass reflections from phone/tablet screens)
-            sat_pixels = np.sum(gray >= 253)
+            # Specular glare check (glass reflections from phone/tablet screens) - AGGRESSIVE
+            sat_pixels = np.sum(gray >= 240)
             sat_ratio = sat_pixels / float(gray.size)
             self.last_metrics["specular_ratio"] = float(sat_ratio)
-            if sat_ratio > 0.08:  # More than 8% pure white blown-out glare on face
-                # self.session_tainted = True
+            if sat_ratio > 0.04:  # More than 4% bright glare on face (typical of screens)
+                self.session_tainted = True
                 self.taint_reason = "Reflejo especular de pantalla detectado"
                 return False, self.taint_reason
+
+
 
             # 2D Fast Fourier Transform for periodic Moiré grid lines
             f_transform = np.fft.fft2(cv2.resize(gray, (96, 96)))
@@ -639,7 +642,7 @@ class AntiSpoofEngine:
             
             # Artificial high-frequency Moiré grid resonance
             if ratio > 0.94:
-                # self.session_tainted = True
+                self.session_tainted = True
                 self.taint_reason = "Patrón Moiré de pantalla digital detectado"
                 return False, self.taint_reason
 
@@ -815,12 +818,12 @@ class GestureEngine:
 
         return None, 0.0, False, False, None
 
-    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.30) -> bool:
+    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
         """Returns True if a Thumb_Up gesture is detected."""
         gesture, score, is_geom_thumb, _, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
 
-    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.30) -> bool:
+    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
         """Returns True if an Open_Palm (🖐️) gesture is detected."""
         gesture, score, _, is_geom_palm, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
@@ -829,7 +832,7 @@ class GestureEngine:
         self,
         frame_bgr: np.ndarray,
         mode: str = "both",
-        min_score: float = 0.30,
+        min_score: float = 0.35,
         primary_face: Optional[np.ndarray] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -860,8 +863,8 @@ class GestureEngine:
             self.last_metrics["rel_dist"] = rel_dist
             
             # Reject hand gripping or touching the phone/photo frame (must be physically separated from face)
-            if rel_dist < 0.40:
-                reason = f"Mano muy cerca de la cara (Dist:{rel_dist:.2f} < 0.40)"
+            if rel_dist < 0.80:
+                reason = f"Mano en borde de pantalla (Dist:{rel_dist:.2f} < 0.80)"
                 self.last_metrics["reason"] = reason
                 return False, reason
 
@@ -884,8 +887,8 @@ class GestureEngine:
 
             # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0040, mad_dist < 0.0018)
             # In a living human holding their hand naturally, std_dist >= 0.0120 and mad_dist >= 0.0040
-            if False:
-                reason = f"Gesto estático en pantalla (StdDist:{std_dist:.4f} < 0.008, MAD:{mad_dist:.4f})"
+            if std_dist < 0.0030 or mad_dist < 0.0010:
+                reason = f"Gesto estático en pantalla (StdDist:{std_dist:.4f} < 0.003, MAD:{mad_dist:.4f})"
                 self.last_metrics["reason"] = reason
                 return False, reason
 
@@ -911,3 +914,60 @@ class GestureEngine:
         name = "Pulgar Arriba (👍)" if thumb_ok else None
         self.last_metrics["reason"] = f"Validado: {name}" if thumb_ok else "No coincide modo"
         return thumb_ok, name
+
+
+class BlinkEngine:
+    def __init__(self, model_path: str = "models/face_landmarker.task"):
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        self.recognizer = None
+        self.has_blinked = False
+        
+        from pathlib import Path
+        if Path(model_path).is_file():
+            try:
+                base_options = python.BaseOptions(model_asset_path=model_path)
+                options = vision.FaceLandmarkerOptions(
+                    base_options=base_options,
+                    output_face_blendshapes=True,
+                    output_facial_transformation_matrixes=False,
+                    num_faces=1
+                )
+                self.recognizer = vision.FaceLandmarker.create_from_options(options)
+            except Exception as e:
+                import logging
+                logging.getLogger("VisageSoul").warning(f"Could not init FaceLandmarker: {e}")
+
+    def reset(self):
+        self.has_blinked = False
+
+    def detect_blink(self, frame_bgr) -> bool:
+        if self.recognizer is None or self.has_blinked:
+            return self.has_blinked
+            
+        try:
+            import cv2
+            import mediapipe as mp
+            rgb_frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            result = self.recognizer.detect(mp_image)
+            
+            if result.face_blendshapes and len(result.face_blendshapes) > 0:
+                blendshapes = result.face_blendshapes[0]
+                left_blink = 0.0
+                right_blink = 0.0
+                for category in blendshapes:
+                    if category.category_name == "eyeBlinkLeft":
+                        left_blink = category.score
+                    elif category.category_name == "eyeBlinkRight":
+                        right_blink = category.score
+                
+                # If both eyes are closed more than 40%
+                if left_blink > 0.40 and right_blink > 0.40:
+                    self.has_blinked = True
+                    return True
+        except Exception:
+            pass
+            
+        return False

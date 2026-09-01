@@ -164,7 +164,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
         start_time = time.time()
         consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 5
+        REQUIRED_CONSECUTIVE_MATCHES = 7
         frame_idx = 0
 
         while (time.time() - start_time) < timeout:
@@ -212,6 +212,12 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                     f"Gesture={gesture_ok} (Raw:{raw_g}:{raw_s:.2f}, Dist:{g_dist:.2f}x, StdDist:{g_std:.4f} -> {g_reason}) | "
                     f"Cons={consecutive_matches}/{REQUIRED_CONSECUTIVE_MATCHES}"
                 )
+
+                # Check blink
+                has_blinked = blink_engine.detect_blink(frame)
+                if not has_blinked:
+                    logger.info("Esperando parpadeo para confirmar vida...")
+                    liveness_passed = False
 
                 if is_match and liveness_passed:
                     if require_gesture and gesture_engine:
