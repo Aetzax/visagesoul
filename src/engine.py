@@ -368,6 +368,7 @@ class AntiSpoofEngine:
         self.models_dir = Path(models_dir)
         self.net = None
         self.landmarks_history: List[Tuple[float, float]] = []
+        self.eye_dynamics_history: List[float] = []
         self.real_scores_history: List[float] = []
         self.screen_scores_history: List[float] = []
         self.print_scores_history: List[float] = []
@@ -390,23 +391,50 @@ class AntiSpoofEngine:
 
     def reset(self):
         self.landmarks_history.clear()
+        self.eye_dynamics_history.clear()
         self.real_scores_history.clear()
         self.screen_scores_history.clear()
         self.print_scores_history.clear()
 
-    def check_3d_rigidity(self, primary_face: np.ndarray) -> Tuple[bool, float, str]:
+    def check_3d_rigidity(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Detects 2D flat photographs (printed or on screens) using projective landmark invariance.
-        A 2D photo has constant distance ratios even under hand tremor / shaking.
+        Detects 2D flat photographs (printed or on screens) using projective landmark invariance and eye dynamics.
+        A 2D photo maintains near-zero affine ratio variation even under hand tremor / shaking.
         """
         if primary_face is None or len(primary_face) < 14:
             return False, 0.0, "Sin rostro"
 
-        re = primary_face[4:6]
-        le = primary_face[6:8]
-        nt = primary_face[8:10]
-        rm = primary_face[10:12]
-        lm = primary_face[12:14]
+        h_img, w_img, _ = frame_bgr.shape
+        bw = int(primary_face[2])
+        re_x, re_y = int(primary_face[4]), int(primary_face[5])
+        le_x, le_y = int(primary_face[6]), int(primary_face[7])
+        nt_x, nt_y = int(primary_face[8]), int(primary_face[9])
+        rm_x, rm_y = int(primary_face[10]), int(primary_face[11])
+        lm_x, lm_y = int(primary_face[12]), int(primary_face[13])
+
+        # 1. Eye Region Vertical Gradient Dynamics
+        rad = max(4, int(bw * 0.08))
+        def get_eye_contrast(ex, ey):
+            y1, y2 = max(0, ey - rad), min(h_img, ey + rad)
+            x1, x2 = max(0, ex - rad), min(w_img, ex + rad)
+            if y2 > y1 and x2 > x1:
+                crop = cv2.cvtColor(frame_bgr[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY)
+                sob = cv2.Sobel(crop, cv2.CV_64F, 0, 1, ksize=3)
+                return float(np.var(sob))
+            return 0.0
+
+        r_cont = get_eye_contrast(re_x, re_y)
+        l_cont = get_eye_contrast(le_x, le_y)
+        self.eye_dynamics_history.append((r_cont + l_cont) / 2.0)
+        if len(self.eye_dynamics_history) > 12:
+            self.eye_dynamics_history.pop(0)
+
+        # 2. Projective Landmark Invariant Ratios
+        re = np.array([re_x, re_y])
+        le = np.array([le_x, le_y])
+        nt = np.array([nt_x, nt_y])
+        rm = np.array([rm_x, rm_y])
+        lm = np.array([lm_x, lm_y])
 
         d_re = np.linalg.norm(nt - re)
         d_le = np.linalg.norm(nt - le)
@@ -416,7 +444,7 @@ class AntiSpoofEngine:
         tri = float(d_eye / (d_mouth + 1e-6))
 
         self.landmarks_history.append((yaw, tri))
-        if len(self.landmarks_history) > 10:
+        if len(self.landmarks_history) > 12:
             self.landmarks_history.pop(0)
 
         # Require at least 4 frames of temporal history before allowing liveness
@@ -426,8 +454,11 @@ class AntiSpoofEngine:
         yaws = [h[0] for h in self.landmarks_history]
         tris = [h[1] for h in self.landmarks_history]
         rigidity_score = float(np.std(yaws) + np.std(tris))
-        # If 2D affine perspective is completely frozen (photo with or without hand tremor)
-        if rigidity_score < 0.0004:
+        eye_std = float(np.std(self.eye_dynamics_history))
+
+        # A living human has living eye micro-saccades (eye_std >= 1.5) or 3D parallax (rigidity_score >= 0.0050)
+        # A static 2D photo has rigidity_score < 0.0040 AND eye_std < 1.2
+        if rigidity_score < 0.0045 and eye_std < 1.5:
             return False, rigidity_score, "Foto 2D estática detectada (Sin perspectiva 3D)"
 
         return True, 1.0, "Rostro 3D Vivo"
@@ -519,8 +550,8 @@ class AntiSpoofEngine:
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
 
-        # 1. 3D Projective Invariance Check (detects static 2D photos)
-        rigidity_ok, rigidity_val, rigidity_msg = self.check_3d_rigidity(primary_face)
+        # 1. 3D Projective Invariance & Living Dynamics Check (detects static 2D photos)
+        rigidity_ok, rigidity_val, rigidity_msg = self.check_3d_rigidity(frame_bgr, primary_face)
         if not rigidity_ok:
             return False, rigidity_val, rigidity_msg
 
