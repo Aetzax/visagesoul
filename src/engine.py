@@ -420,7 +420,7 @@ class AntiSpoofEngine:
 
     def check_3d_rigidity(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Detects 2D flat photographs (printed or on screens) using projective landmark invariance and eye dynamics.
+        Detects 2D flat photographs (printed or on screens) using projective landmark invariance and normalized eye dynamics.
         A 2D photo maintains near-zero affine ratio variation even under hand tremor / shaking.
         """
         if primary_face is None or len(primary_face) < 14:
@@ -428,63 +428,50 @@ class AntiSpoofEngine:
 
         h_img, w_img, _ = frame_bgr.shape
         bw = int(primary_face[2])
-        re_x, re_y = int(primary_face[4]), int(primary_face[5])
-        le_x, le_y = int(primary_face[6]), int(primary_face[7])
-        nt_x, nt_y = int(primary_face[8]), int(primary_face[9])
-        rm_x, rm_y = int(primary_face[10]), int(primary_face[11])
-        lm_x, lm_y = int(primary_face[12]), int(primary_face[13])
+        re = primary_face[4:6]
+        le = primary_face[6:8]
+        nt = primary_face[8:10]
+        rm = primary_face[10:12]
+        lm = primary_face[12:14]
 
-        # 1. Eye Region Vertical Gradient Dynamics
+        # 1. 3D Projective Aspect Ratio: Nose-to-Eye-Midpoint vs Eye-Span
+        eye_mid = (re + le) / 2.0
+        eye_span = float(np.linalg.norm(le - re) + 1e-6)
+        nose_dist = float(np.linalg.norm(nt - eye_mid))
+        geom_ratio = float(nose_dist / eye_span)
+
+        # 2. Normalized Eye Region Vertical Gradient Contrast
+        re_x, re_y = int(re[0]), int(re[1])
         rad = max(4, int(bw * 0.08))
-        def get_eye_contrast(ex, ey):
-            y1, y2 = max(0, ey - rad), min(h_img, ey + rad)
-            x1, x2 = max(0, ex - rad), min(w_img, ex + rad)
-            if y2 > y1 and x2 > x1:
-                crop = cv2.cvtColor(frame_bgr[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY)
-                sob = cv2.Sobel(crop, cv2.CV_64F, 0, 1, ksize=3)
-                return float(np.var(sob))
-            return 0.0
+        y1, y2 = max(0, re_y - rad), min(h_img, re_y + rad)
+        x1, x2 = max(0, re_x - rad), min(w_img, re_x + rad)
+        if y2 > y1 and x2 > x1:
+            gray = cv2.cvtColor(frame_bgr[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+            sob_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+            eye_cont = float(np.var(sob_y))
+        else:
+            eye_cont = 0.0
 
-        r_cont = get_eye_contrast(re_x, re_y)
-        l_cont = get_eye_contrast(le_x, le_y)
-        self.eye_dynamics_history.append((r_cont + l_cont) / 2.0)
-        if len(self.eye_dynamics_history) > 12:
-            self.eye_dynamics_history.pop(0)
-
-        # 2. Projective Landmark Invariant Ratios
-        re = np.array([re_x, re_y])
-        le = np.array([le_x, le_y])
-        nt = np.array([nt_x, nt_y])
-        rm = np.array([rm_x, rm_y])
-        lm = np.array([lm_x, lm_y])
-
-        d_re = np.linalg.norm(nt - re)
-        d_le = np.linalg.norm(nt - le)
-        yaw = float((d_re - d_le) / (d_re + d_le + 1e-6))
-        d_eye = np.linalg.norm(le - re)
-        d_mouth = np.linalg.norm(lm - rm)
-        tri = float(d_eye / (d_mouth + 1e-6))
-
-        self.landmarks_history.append((yaw, tri))
+        self.landmarks_history.append((geom_ratio, 0.0))
+        self.eye_dynamics_history.append(eye_cont)
         if len(self.landmarks_history) > 12:
             self.landmarks_history.pop(0)
+            self.eye_dynamics_history.pop(0)
 
-        # Require at least 4 frames of temporal history before allowing liveness
-        if len(self.landmarks_history) < 4:
+        # Require at least 5 frames of temporal history before allowing liveness
+        if len(self.landmarks_history) < 5:
             return False, 0.0, "Analizando perspectiva 3D..."
 
-        yaws = [h[0] for h in self.landmarks_history]
-        tris = [h[1] for h in self.landmarks_history]
-        rigidity_score = float(np.std(yaws) + np.std(tris))
-        eye_std = float(np.std(self.eye_dynamics_history))
+        ratios = [h[0] for h in self.landmarks_history]
+        std_geom = float(np.std(ratios))
+        std_eye = float(np.std(self.eye_dynamics_history))
 
-        self.last_metrics["rigidity_score"] = rigidity_score
-        self.last_metrics["eye_std"] = eye_std
+        self.last_metrics["rigidity_score"] = std_geom
+        self.last_metrics["eye_std"] = std_eye
 
-        # A living human has living eye micro-saccades (eye_std >= 1.5) or 3D parallax (rigidity_score >= 0.0050)
-        # A static 2D photo has rigidity_score < 0.0040 AND eye_std < 1.2
-        if rigidity_score < 0.0045 and eye_std < 1.5:
-            return False, rigidity_score, "Foto 2D estática detectada (Sin perspectiva 3D)"
+        # In a 2D photo (even hand-held), std_geom is <= 0.0050 and std_eye is <= 0.0004
+        if std_geom < 0.0080 and std_eye < 0.0008:
+            return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
 
         return True, 1.0, "Rostro 3D Vivo"
 

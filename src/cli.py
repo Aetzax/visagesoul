@@ -314,30 +314,10 @@ def cmd_test(args):
         eye_std = metrics.get("eye_std", 0.0)
 
         cv2.rectangle(display_frame, (0, h - 55), (w, h), (15, 15, 15), -1)
-        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.0045)"
-        hud_line2 = f"Dinamica Ocular: {eye_std:.2f} (req >= 1.50) | Consenso: {consecutive_test_matches}/3 | Gesto: {gesture_name}"
+        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.008)"
+        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.0008) | Consenso: {consecutive_test_matches}/3 | Gesto: {gesture_name}"
         cv2.putText(display_frame, hud_line1, (15, h - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
         cv2.putText(display_frame, hud_line2, (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200) if gesture_valid else (180, 180, 180), 1)
-
-        detected_label = None
-        if gesture_name == "Thumb_Up" or is_geom_thumb:
-            detected_label = "Pulgar Arriba [OK]"
-        elif gesture_name == "Open_Palm" or is_geom_palm:
-            detected_label = "Mano Abierta [OK]"
-        elif gesture_name and gesture_name != "None":
-            detected_label = gesture_name
-
-        if detected_label:
-            cv2.rectangle(display_frame, (0, h - 40), (w, h), (20, 20, 20), -1)
-            cv2.putText(
-                display_frame,
-                f"Gesto detectado: {detected_label}",
-                (20, h - 12),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 128) if gesture_valid else (200, 200, 200),
-                2,
-            )
 
         cv2.imshow(window_name, display_frame)
         key = cv2.waitKey(1) & 0xFF
