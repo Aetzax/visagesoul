@@ -367,6 +367,7 @@ class AntiSpoofEngine:
             models_dir = config.get("paths", "models_dir")
         self.models_dir = Path(models_dir)
         self.net = None
+        self.landmarks_history: List[Tuple[float, float]] = []
         self.real_scores_history: List[float] = []
         self.screen_scores_history: List[float] = []
         self.print_scores_history: List[float] = []
@@ -388,9 +389,45 @@ class AntiSpoofEngine:
                     logger.warning(f"Failed to load MiniFASNet model from {p}: {e}")
 
     def reset(self):
+        self.landmarks_history.clear()
         self.real_scores_history.clear()
         self.screen_scores_history.clear()
         self.print_scores_history.clear()
+
+    def check_3d_rigidity(self, primary_face: np.ndarray) -> Tuple[bool, float, str]:
+        """
+        Detects 2D flat photographs (printed or on screens) using projective landmark invariance.
+        A 2D photo has constant distance ratios even under hand tremor / shaking.
+        """
+        if primary_face is None or len(primary_face) < 14:
+            return True, 1.0, "OK"
+
+        re = primary_face[4:6]
+        le = primary_face[6:8]
+        nt = primary_face[8:10]
+        rm = primary_face[10:12]
+        lm = primary_face[12:14]
+
+        d_re = np.linalg.norm(nt - re)
+        d_le = np.linalg.norm(nt - le)
+        yaw = float((d_re - d_le) / (d_re + d_le + 1e-6))
+        d_eye = np.linalg.norm(le - re)
+        d_mouth = np.linalg.norm(lm - rm)
+        tri = float(d_eye / (d_mouth + 1e-6))
+
+        self.landmarks_history.append((yaw, tri))
+        if len(self.landmarks_history) > 10:
+            self.landmarks_history.pop(0)
+
+        if len(self.landmarks_history) >= 4:
+            yaws = [h[0] for h in self.landmarks_history]
+            tris = [h[1] for h in self.landmarks_history]
+            rigidity_score = float(np.std(yaws) + np.std(tris))
+            # If 2D affine perspective is completely frozen (photo with or without hand tremor)
+            if rigidity_score < 0.0004:
+                return False, rigidity_score, "Foto 2D estática detectada (Sin perspectiva 3D)"
+
+        return True, 1.0, "Rostro 3D Vivo"
 
     def infer_neural_fas(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
@@ -473,13 +510,18 @@ class AntiSpoofEngine:
 
     def analyze_frame(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Comprehensive liveness verification powered by MiniFASNet V2 neural network.
+        Comprehensive liveness verification powered by MiniFASNet V2 neural network and 3D parallax analysis.
         Returns (is_live, confidence, description).
         """
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
 
-        # 1. Deep Learning Neural Anti-Spoofing (MiniFASNet V2)
+        # 1. 3D Projective Invariance Check (detects static 2D photos)
+        rigidity_ok, rigidity_val, rigidity_msg = self.check_3d_rigidity(primary_face)
+        if not rigidity_ok:
+            return False, rigidity_val, rigidity_msg
+
+        # 2. Deep Learning Neural Anti-Spoofing (MiniFASNet V2)
         neural_ok, neural_score, neural_msg = self.infer_neural_fas(frame_bgr, primary_face)
         if not neural_ok:
             return False, neural_score, neural_msg
