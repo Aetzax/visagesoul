@@ -422,10 +422,25 @@ class AntiSpoofEngine:
             "avg_real": 0.0,
         }
 
+    def align_face_canonical(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> np.ndarray:
+        """Aligns face to canonical 112x112 coordinate space using eye landmarks."""
+        re = primary_face[4:6]
+        le = primary_face[6:8]
+        eye_center = ((re[0] + le[0]) / 2.0, (re[1] + le[1]) / 2.0)
+        dy = le[1] - re[1]
+        dx = le[0] - re[0]
+        angle = float(np.degrees(np.arctan2(dy, dx)))
+        dist = float(np.sqrt(dx**2 + dy**2))
+        scale = 48.0 / max(1.0, dist)
+        M = cv2.getRotationMatrix2D(eye_center, angle, scale)
+        M[0, 2] += (56.0 - eye_center[0])
+        M[1, 2] += (45.0 - eye_center[1])
+        return cv2.warpAffine(frame_bgr, M, (112, 112), flags=cv2.INTER_LINEAR)
+
     def check_3d_rigidity(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Detects 2D flat photographs (printed or on screens) using projective landmark invariance and normalized eye dynamics.
-        A 2D photo maintains near-zero affine ratio variation even under hand tremor / shaking.
+        Detects 2D flat photographs (printed or on screens, handheld or tripod-mounted)
+        using projective landmark invariance and canonical aligned eye dynamics.
         """
         if self.session_tainted:
             return False, 0.0, self.taint_reason
@@ -433,13 +448,9 @@ class AntiSpoofEngine:
         if primary_face is None or len(primary_face) < 14:
             return False, 0.0, "Sin rostro"
 
-        h_img, w_img, _ = frame_bgr.shape
-        bw = int(primary_face[2])
         re = primary_face[4:6]
         le = primary_face[6:8]
         nt = primary_face[8:10]
-        rm = primary_face[10:12]
-        lm = primary_face[12:14]
 
         # 1. 3D Projective Aspect Ratio: Nose-to-Eye-Midpoint vs Eye-Span
         eye_mid = (re + le) / 2.0
@@ -447,27 +458,21 @@ class AntiSpoofEngine:
         nose_dist = float(np.linalg.norm(nt - eye_mid))
         geom_ratio = float(nose_dist / eye_span)
 
-        # 2. Normalized Eye Region Vertical Gradient Contrast
-        re_x, re_y = int(re[0]), int(re[1])
-        rad = max(4, int(bw * 0.08))
-        y1, y2 = max(0, re_y - rad), min(h_img, re_y + rad)
-        x1, x2 = max(0, re_x - rad), min(w_img, re_x + rad)
-        if y2 > y1 and x2 > x1:
-            gray = cv2.cvtColor(frame_bgr[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
-            sob_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-            eye_cont = float(np.var(sob_y))
-        else:
-            eye_cont = 0.0
+        # 2. Canonical Aligned Eye Region Dynamics (immune to landmark pixel quantization noise)
+        aligned = self.align_face_canonical(frame_bgr, primary_face)
+        eye_band = cv2.cvtColor(aligned[32:58, 16:96], cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+        sob_y = cv2.Sobel(eye_band, cv2.CV_32F, 0, 1, ksize=3)
+        eye_cont = float(np.var(sob_y))
 
         self.landmarks_history.append((geom_ratio, 0.0))
         self.eye_dynamics_history.append(eye_cont)
-        if len(self.landmarks_history) > 12:
+        if len(self.landmarks_history) > 16:
             self.landmarks_history.pop(0)
             self.eye_dynamics_history.pop(0)
 
-        # Require at least 5 frames of temporal history before allowing liveness
-        if len(self.landmarks_history) < 5:
-            return False, 0.0, "Analizando perspectiva 3D..."
+        # Require at least 8 frames of temporal history before allowing liveness
+        if len(self.landmarks_history) < 8:
+            return False, 0.0, "Analizando perspectiva 3D y dinamica ocular..."
 
         ratios = [h[0] for h in self.landmarks_history]
         std_geom = float(np.std(ratios))
@@ -476,8 +481,9 @@ class AntiSpoofEngine:
         self.last_metrics["rigidity_score"] = std_geom
         self.last_metrics["eye_std"] = std_eye
 
-        # In a 2D photo, eyes are frozen (std_eye < 0.0004) or geometry is flat (std_geom < 0.0060)
-        if std_eye < 0.0004:
+        # In a 2D photo on a tripod or handheld:
+        # std_eye < 0.0003 indicates frozen 2D eyes, std_geom < 0.0060 indicates flat 2D perspective
+        if std_eye < 0.0003:
             return False, std_geom, "Foto 2D estática detectada (Ojos congelados)"
         if std_geom < 0.0060:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
@@ -600,14 +606,24 @@ class AntiSpoofEngine:
 
 class GestureEngine:
     """
-    Hand Gesture Recognition Engine using MediaPipe Tasks (Thumb_Up 👍, Open_Palm, Victory, etc.).
+    Hand Gesture Recognition Engine using MediaPipe Tasks (Thumb_Up 👍, Open_Palm, Victory, etc.)
+    with dynamic hand-to-face relative vector verification against static 2D spoof attacks.
     """
-    def __init__(self, models_dir: Optional[str] = None):
-        if models_dir is None:
-            models_dir = config.get("paths", "models_dir")
-        self.models_dir = Path(models_dir)
-        self.model_path = self.models_dir / "gesture_recognizer.task"
+
+    def __init__(self, model_path: Optional[Union[str, Path]] = None):
+        self.model_path = Path(model_path) if model_path else Path(__file__).resolve().parent.parent / "models" / "gesture_recognizer.task"
+        if not self.model_path.is_file():
+            system_paths = [
+                Path("/usr/share/visagesoul/models/gesture_recognizer.task"),
+                Path("/opt/visagesoul/models/gesture_recognizer.task"),
+            ]
+            for p in system_paths:
+                if p.is_file():
+                    self.model_path = p
+                    break
+
         self.recognizer = None
+        self.hand_face_history: List[Tuple[float, float]] = []
 
         if self.model_path.is_file():
             try:
@@ -626,13 +642,16 @@ class GestureEngine:
             except Exception as e:
                 logger.warning(f"Could not initialize MediaPipe GestureRecognizer: {e}")
 
-    def detect_gesture(self, frame_bgr: np.ndarray) -> Tuple[Optional[str], float, bool, bool]:
+    def reset(self):
+        self.hand_face_history.clear()
+
+    def detect_gesture(self, frame_bgr: np.ndarray) -> Tuple[Optional[str], float, bool, bool, Optional[Tuple[float, float]]]:
         """
         Detects hand gesture in a BGR frame.
-        Returns (gesture_category, confidence_score, is_geometric_thumb_up, is_geometric_open_palm).
+        Returns (gesture_category, confidence_score, is_geometric_thumb_up, is_geometric_open_palm, wrist_pixel_coords).
         """
         if self.recognizer is None:
-            return None, 0.0, False, False
+            return None, 0.0, False, False, None
 
         try:
             import mediapipe as mp
@@ -644,6 +663,7 @@ class GestureEngine:
             top_gesture_score = 0.0
             is_geom_thumb = False
             is_geom_palm = False
+            wrist_px = None
 
             if result.gestures and len(result.gestures) > 0:
                 top_gesture = result.gestures[0][0]
@@ -651,9 +671,11 @@ class GestureEngine:
                 top_gesture_score = top_gesture.score
 
             if result.hand_landmarks and len(result.hand_landmarks) > 0:
+                h_img, w_img, _ = frame_bgr.shape
                 for lm in result.hand_landmarks:
                     if len(lm) >= 21:
                         wrist = lm[0]
+                        wrist_px = (wrist.x * w_img, wrist.y * h_img)
                         thumb_tip, thumb_ip, thumb_mcp = lm[4], lm[3], lm[2]
                         index_tip, index_pip, index_mcp = lm[8], lm[6], lm[5]
                         middle_tip, middle_pip, middle_mcp = lm[12], lm[10], lm[9]
@@ -691,30 +713,55 @@ class GestureEngine:
                         if is_geom_thumb or is_geom_palm:
                             break
 
-            return top_gesture_name, top_gesture_score, is_geom_thumb, is_geom_palm
+            return top_gesture_name, top_gesture_score, is_geom_thumb, is_geom_palm, wrist_px
         except Exception as e:
             logger.debug(f"Gesture error: {e}")
 
-        return None, 0.0, False, False
+        return None, 0.0, False, False, None
 
     def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
         """Returns True if a Thumb_Up gesture is detected."""
-        gesture, score, is_geom_thumb, _ = self.detect_gesture(frame_bgr)
+        gesture, score, is_geom_thumb, _, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
 
     def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
         """Returns True if an Open_Palm (🖐️) gesture is detected."""
-        gesture, score, _, is_geom_palm = self.detect_gesture(frame_bgr)
+        gesture, score, _, is_geom_palm, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
 
-    def is_gesture_valid(self, frame_bgr: np.ndarray, mode: str = "thumb_up", min_score: float = 0.35) -> Tuple[bool, Optional[str]]:
+    def is_gesture_valid(
+        self,
+        frame_bgr: np.ndarray,
+        mode: str = "thumb_up",
+        min_score: float = 0.35,
+        primary_face: Optional[np.ndarray] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """
         Validates gesture against requested mode: 'thumb_up', 'open_palm', or 'both'/'any'.
+        Also verifies non-rigid hand-to-face dynamic vector if primary_face is provided.
         Returns (is_valid, detected_gesture_name).
         """
-        gesture, score, is_geom_thumb, is_geom_palm = self.detect_gesture(frame_bgr)
+        gesture, score, is_geom_thumb, is_geom_palm, wrist_px = self.detect_gesture(frame_bgr)
         thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
         palm_ok = (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
+
+        # Verify dynamic relative movement between hand and face (defeats pre-printed photo hand attacks)
+        if primary_face is not None and wrist_px is not None and len(primary_face) >= 4:
+            fc = (primary_face[0] + primary_face[2] / 2.0, primary_face[1] + primary_face[3] / 2.0)
+            v = (
+                float(wrist_px[0] - fc[0]) / max(1.0, float(primary_face[2])),
+                float(wrist_px[1] - fc[1]) / max(1.0, float(primary_face[3])),
+            )
+            self.hand_face_history.append(v)
+            if len(self.hand_face_history) > 16:
+                self.hand_face_history.pop(0)
+
+            if len(self.hand_face_history) >= 8:
+                vx = [h[0] for h in self.hand_face_history]
+                vy = [h[1] for h in self.hand_face_history]
+                std_hand = float(np.sqrt(np.std(vx)**2 + np.std(vy)**2))
+                if std_hand < 0.0080:
+                    return False, "Gesto estático preimpreso detectado"
 
         mode_clean = str(mode).lower().strip()
         if mode_clean in ("thumb_up", "thumbs_up", "pulgar", "pulgar_arriba"):

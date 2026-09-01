@@ -172,15 +172,11 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                 continue
 
             frame_idx += 1
-            process_frame = frame
-            if low_light_boost:
-                process_frame, _ = check_and_boost_light(frame)
+            faces = engine.detect_faces(frame)
+            primary = engine.get_primary_face(faces)
 
-            faces = engine.detect_faces(process_frame)
-            primary_face = engine.get_primary_face(faces, min_size=config.getint("security", "min_face_size", 60))
-
-            if primary_face is not None:
-                target_emb = engine.extract_embedding(process_frame, primary_face)
+            if primary is not None:
+                target_emb = engine.extract_embedding(frame, primary)
                 is_match, score = engine.verify_against_profile(target_emb, user_embeddings, threshold=threshold)
 
                 # Anti-spoofing FAS multi-layer check (Screens, Photos, Replays)
@@ -188,7 +184,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                 liveness_msg = "OK"
                 liveness_score = 1.0
                 if liveness_check:
-                    liveness_passed, liveness_score, liveness_msg = engine.check_liveness(frame, primary_face)
+                    liveness_passed, liveness_score, liveness_msg = engine.check_liveness(frame, primary)
 
                 metrics = engine.get_last_antispoof_metrics()
                 p_real = metrics.get("p_real", 0.0)
@@ -199,7 +195,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                 gesture_ok = True
                 g_name = "N/A"
                 if require_gesture and gesture_engine:
-                    gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
+                    gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type, primary_face=primary)
 
                 logger.debug(
                     f"Frame #{frame_idx:02d}: Match={is_match} ({score:.3f}/{threshold:.2f}) | "
