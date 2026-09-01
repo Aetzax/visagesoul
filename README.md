@@ -74,8 +74,9 @@ VisageSoul uses a defense-in-depth architecture to prevent spoofing attacks such
 
 ## Uninstallation
 
-To cleanly remove VisageSoul and restore default PAM configurations:
+You can easily uninstall VisageSoul directly from the **GUI Control Panel** by clicking the uninstall option, which will automatically restore your default PAM configurations.
 
+Alternatively, to cleanly remove it via the terminal, run:
 ```bash
 sudo ./VisageSuninstall.sh
 ```
