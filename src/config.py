@@ -78,6 +78,19 @@ class Config:
                 self.config.read(user_cfg)
                 self.loaded_path = user_cfg
 
+            # Also check target user's home if running as root under PAM
+            target_user = os.environ.get("PAM_USER") or os.environ.get("SUDO_USER")
+            if target_user and target_user != "root":
+                try:
+                    import pwd
+                    u_home = Path(pwd.getpwnam(target_user).pw_dir)
+                    u_cfg = u_home / ".config" / "visagesoul" / "config.ini"
+                    if u_cfg.is_file():
+                        self.config.read(u_cfg)
+                        self.loaded_path = u_cfg
+                except Exception:
+                    pass
+
         # Fallback local models_dir if running from source tree
         source_models_dir = Path(__file__).resolve().parent.parent / "models"
         if not Path(self.get("paths", "models_dir")).is_dir() and source_models_dir.is_dir():

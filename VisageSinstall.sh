@@ -53,6 +53,11 @@ else
     sed -i 's/^debug\s*=.*/debug = false/' /etc/visagesoul/config.ini 2>/dev/null || true
 fi
 
+# Ensure gesture 2FA is active by default as recommended
+sed -i 's/^require_thumbs_up\s*=.*/require_thumbs_up = true/' /etc/visagesoul/config.ini 2>/dev/null || true
+grep -q "require_gesture" /etc/visagesoul/config.ini 2>/dev/null || sed -i '/\[security\]/a require_gesture = true' /etc/visagesoul/config.ini 2>/dev/null || true
+grep -q "gesture_type" /etc/visagesoul/config.ini 2>/dev/null || sed -i '/\[security\]/a gesture_type = both' /etc/visagesoul/config.ini 2>/dev/null || true
+
 chmod 755 /etc/visagesoul
 chmod 644 /etc/visagesoul/config.ini 2>/dev/null || true
 chmod 755 /etc/visagesoul/faces
