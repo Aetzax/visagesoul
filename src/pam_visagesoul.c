@@ -365,13 +365,15 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             return PAM_SUCCESS;
         } else if (exit_code == 3) {
             /* Max failed attempts exceeded -> cleanly fall back to password entry */
-            if (notify) send_pam_info(pamh, "Límite de intentos superado. Introduce tu contraseña.");
+            if (notify) send_pam_info(pamh, "Límite de cámara superado. Introduce tu contraseña.");
             return PAM_AUTHINFO_UNAVAIL;
         } else if (exit_code == 2) {
             if (debug) syslog(LOG_NOTICE, "Camera unavailable or busy. Falling back.");
             return PAM_IGNORE;
         } else {
             if (debug) syslog(LOG_NOTICE, "Biometric match failed or timed out for '%s'. Falling back to password.", username);
+            /* Clear the stuck PAM message in KDE/SDDM so the user knows they can type the password */
+            if (notify) send_pam_info(pamh, "  "); 
             return PAM_AUTHINFO_UNAVAIL;
         }
     }
