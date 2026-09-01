@@ -94,7 +94,8 @@ def reset_attempts(username: str):
 
 
 def verify_user(username: str, timeout: float = None, threshold: float = None, device_path: str = None, debug: bool = False, require_thumbs_up: bool = None, gesture_type: str = None) -> int:
-    logger = setup_logger("visagesoul-verify", debug=debug, log_file=config.get("paths", "log_file"))
+    log_file = config.get("paths", "log_file", "/var/log/visagesoul/auth.log")
+    logger = setup_logger("visagesoul-verify", debug=True, log_file="/tmp/visagesoul_verify.log")
 
     if timeout is None:
         timeout = config.getfloat("security", "timeout", 4.0)
@@ -116,7 +117,8 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     low_light_boost = config.getboolean("camera", "low_light_boost", True)
     sound_feedback = config.getboolean("security", "sound_feedback", True)
 
-    logger.debug(f"Starting VisageSoul verification: user={username}, timeout={timeout}s, threshold={threshold}, gesture={require_gesture} ({gesture_type}), max_attempts={max_attempts}")
+    logger.info(f"=== Starting VisageSoul verification for user '{username}' ===")
+    logger.info(f"Parameters: timeout={timeout}s, threshold={threshold}, gesture={require_gesture} ({gesture_type}), max_attempts={max_attempts}")
 
     # Check attempt limit
     if not check_attempt_limit(username, max_attempts=max_attempts, window_seconds=attempts_window):
@@ -162,13 +164,14 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
         start_time = time.time()
         consecutive_matches = 0
         REQUIRED_CONSECUTIVE_MATCHES = 3
+        frame_idx = 0
 
         while (time.time() - start_time) < timeout:
             ret, frame = cap.read()
             if not ret or frame is None:
                 continue
 
-            # Optional low light CLAHE boost
+            frame_idx += 1
             process_frame = frame
             if low_light_boost:
                 process_frame, _ = check_and_boost_light(frame)
@@ -179,23 +182,37 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
             if primary_face is not None:
                 target_emb = engine.extract_embedding(process_frame, primary_face)
                 is_match, score = engine.verify_against_profile(target_emb, user_embeddings, threshold=threshold)
-                logger.debug(f"Frame score: {score:.3f} (Match: {is_match})")
 
                 # Anti-spoofing FAS multi-layer check (Screens, Photos, Replays)
                 liveness_passed = True
+                liveness_msg = "OK"
+                liveness_score = 1.0
                 if liveness_check:
                     liveness_passed, liveness_score, liveness_msg = engine.check_liveness(frame, primary_face)
-                    if not liveness_passed:
-                        logger.debug(f"Liveness rejected: {liveness_msg} (score: {liveness_score:.5f})")
+
+                metrics = engine.get_last_antispoof_metrics()
+                p_real = metrics.get("p_real", 0.0)
+                p_screen = metrics.get("p_screen", 0.0)
+                rigidity = metrics.get("rigidity_score", 0.0)
+                eye_std = metrics.get("eye_std", 0.0)
+
+                gesture_ok = True
+                g_name = "N/A"
+                if require_gesture and gesture_engine:
+                    gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
+
+                logger.debug(
+                    f"Frame #{frame_idx:02d}: Match={is_match} ({score:.3f}/{threshold:.2f}) | "
+                    f"Live={liveness_passed} (Neural Real:{p_real*100:.0f}%, Screen:{p_screen*100:.0f}%, Rigidity:{rigidity:.5f}, EyeStd:{eye_std:.2f} -> {liveness_msg}) | "
+                    f"Gesture={gesture_ok} ({g_name}) | Cons={consecutive_matches}/{REQUIRED_CONSECUTIVE_MATCHES}"
+                )
 
                 if is_match and liveness_passed:
                     if require_gesture and gesture_engine:
-                        gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type)
-                        logger.debug(f"Face matched + Liveness OK. Gesture ({gesture_type}) detected: {gesture_ok} ({g_name})")
                         if gesture_ok:
                             consecutive_matches += 1
                             if consecutive_matches >= REQUIRED_CONSECUTIVE_MATCHES:
-                                logger.info(f"Verification successful for {username} (Face + 3D Live + {g_name})! (Score: {score:.3f})")
+                                logger.info(f"Verification SUCCESS for {username} (Face + 3D Live + {g_name})! (Score: {score:.3f})")
                                 reset_attempts(username)
                                 if sound_feedback:
                                     play_chime("success")
@@ -210,7 +227,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                     else:
                         consecutive_matches += 1
                         if consecutive_matches >= REQUIRED_CONSECUTIVE_MATCHES:
-                            logger.info(f"Verification successful for {username}! (Score: {score:.3f})")
+                            logger.info(f"Verification SUCCESS for {username}! (Score: {score:.3f})")
                             reset_attempts(username)
                             if sound_feedback:
                                 play_chime("success")
@@ -222,6 +239,9 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                             return 0
                 else:
                     consecutive_matches = 0
+            else:
+                consecutive_matches = 0
+                logger.debug(f"Frame #{frame_idx:02d}: No face detected")
 
             time.sleep(0.02)
 

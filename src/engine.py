@@ -122,6 +122,10 @@ class FaceEngine:
         """
         return self.antispoof.analyze_frame(frame_bgr, primary_face)
 
+    def get_last_antispoof_metrics(self) -> Dict[str, Any]:
+        """Returns internal telemetry metrics from the latest anti-spoof evaluation."""
+        return self.antispoof.last_metrics
+
     def compute_liveness_score(self, face_history: List[np.ndarray]) -> float:
         """
         Analyzes 3D non-rigid parallax & landmark micro-fluctuations across consecutive frames.
@@ -372,6 +376,15 @@ class AntiSpoofEngine:
         self.real_scores_history: List[float] = []
         self.screen_scores_history: List[float] = []
         self.print_scores_history: List[float] = []
+        self.last_metrics: Dict[str, Any] = {
+            "rigidity_score": 0.0,
+            "eye_std": 0.0,
+            "p_real": 0.0,
+            "p_screen": 0.0,
+            "p_print": 0.0,
+            "max_screen": 0.0,
+            "avg_real": 0.0,
+        }
 
         # Find model file in configured dir or local fallback
         candidates = [
@@ -395,6 +408,15 @@ class AntiSpoofEngine:
         self.real_scores_history.clear()
         self.screen_scores_history.clear()
         self.print_scores_history.clear()
+        self.last_metrics = {
+            "rigidity_score": 0.0,
+            "eye_std": 0.0,
+            "p_real": 0.0,
+            "p_screen": 0.0,
+            "p_print": 0.0,
+            "max_screen": 0.0,
+            "avg_real": 0.0,
+        }
 
     def check_3d_rigidity(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
@@ -455,6 +477,9 @@ class AntiSpoofEngine:
         tris = [h[1] for h in self.landmarks_history]
         rigidity_score = float(np.std(yaws) + np.std(tris))
         eye_std = float(np.std(self.eye_dynamics_history))
+
+        self.last_metrics["rigidity_score"] = rigidity_score
+        self.last_metrics["eye_std"] = eye_std
 
         # A living human has living eye micro-saccades (eye_std >= 1.5) or 3D parallax (rigidity_score >= 0.0050)
         # A static 2D photo has rigidity_score < 0.0040 AND eye_std < 1.2
@@ -530,6 +555,12 @@ class AntiSpoofEngine:
             max_print = max(self.print_scores_history)
             avg_print = sum(self.print_scores_history) / len(self.print_scores_history)
             avg_real = sum(self.real_scores_history) / len(self.real_scores_history)
+
+            self.last_metrics["p_real"] = p_real
+            self.last_metrics["p_screen"] = p_screen
+            self.last_metrics["p_print"] = p_print
+            self.last_metrics["max_screen"] = max_screen
+            self.last_metrics["avg_real"] = avg_real
 
             # If any significant screen energy exists in the rolling buffer
             if max_screen >= 0.55 or avg_screen >= 0.35:

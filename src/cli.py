@@ -294,16 +294,30 @@ def cmd_test(args):
                 2,
             )
         else:
+            consecutive_test_matches = 0
             cv2.rectangle(display_frame, (0, 0), (w, 60), (30, 30, 30), -1)
             cv2.putText(
                 display_frame,
                 "Esperando rostro...",
                 (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.75,
-                (200, 200, 200),
+                0.70,
+                (180, 180, 180),
                 2,
             )
+
+        # Draw Real-time Telemetry HUD at the bottom
+        metrics = engine.get_last_antispoof_metrics()
+        p_real = metrics.get("p_real", 0.0)
+        p_screen = metrics.get("p_screen", 0.0)
+        rigidity = metrics.get("rigidity_score", 0.0)
+        eye_std = metrics.get("eye_std", 0.0)
+
+        cv2.rectangle(display_frame, (0, h - 55), (w, h), (15, 15, 15), -1)
+        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.0045)"
+        hud_line2 = f"Dinamica Ocular: {eye_std:.2f} (req >= 1.50) | Consenso: {consecutive_test_matches}/3 | Gesto: {gesture_name}"
+        cv2.putText(display_frame, hud_line1, (15, h - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+        cv2.putText(display_frame, hud_line2, (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200) if gesture_valid else (180, 180, 180), 1)
 
         detected_label = None
         if gesture_name == "Thumb_Up" or is_geom_thumb:
