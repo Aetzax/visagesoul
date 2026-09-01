@@ -481,11 +481,12 @@ class AntiSpoofEngine:
         self.last_metrics["rigidity_score"] = std_geom
         self.last_metrics["eye_std"] = std_eye
 
-        # In a 2D photo (tripod or handheld), eyes are frozen (std_eye < 0.0002) AND 3D geometry is flat (std_geom < 0.0050)
-        # Real humans always have living eye dynamics (std_eye >= 0.0006) or 3D head movement (std_geom >= 0.0060)
-        if std_eye < 0.0002 and std_geom < 0.0050:
+        # In a 2D photo on a tripod or handheld:
+        # std_geom is <= 0.0035, while a real human has natural 3D micro-pitch/yaw where std_geom >= 0.0200.
+        # std_eye is <= 0.0008, while living eyes have saccades/blinks where std_eye >= 0.0100.
+        if std_geom < 0.0080:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
-        elif std_eye < 0.00008:
+        if std_eye < 0.0020:
             return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
 
         return True, 1.0, "Rostro 3D Vivo"
@@ -758,11 +759,11 @@ class GestureEngine:
             if len(self.hand_face_history) > 16:
                 self.hand_face_history.pop(0)
 
-            if len(self.hand_face_history) >= 8:
+            if len(self.hand_face_history) >= 4:
                 vx = [h[0] for h in self.hand_face_history]
                 vy = [h[1] for h in self.hand_face_history]
                 std_hand = float(np.sqrt(np.std(vx)**2 + np.std(vy)**2))
-                if std_hand < 0.0080:
+                if std_hand < 0.0050:
                     return False, "Gesto estático preimpreso detectado"
 
         mode_clean = str(mode).lower().strip()
