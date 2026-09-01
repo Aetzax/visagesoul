@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License">
-  <img src="https://img.shields.io/badge/platform-Linux-lightgrey.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/C-PAM%20Module-00599C.svg" alt="C PAM">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-blue.svg" alt="License"></a>
+  <a href="https://github.com/Aetzax/visagesoul"><img src="https://img.shields.io/badge/platform-Linux-lightgrey.svg" alt="Platform"></a>
+  <a href="https://github.com/Aetzax/visagesoul/tree/main/src"><img src="https://img.shields.io/badge/C-PAM%20Module-00599C.svg" alt="C PAM"></a>
 </p>
 
 ---
