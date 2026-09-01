@@ -353,22 +353,88 @@ class FaceEngine:
 
 class AntiSpoofEngine:
     """
-    Multi-layer Face Anti-Spoofing (FAS) Engine.
+    Multi-layer Face Anti-Spoofing (FAS) Engine with Deep Learning (MiniFASNet V2).
     Detects 2D presentation attacks (printed photos on paper, phone/tablet screens, replay attacks).
 
     Evaluates:
-    1. 2D Fourier Transform High-Frequency Moire Energy (detects digital screen pixel grids).
-    2. Color Chrominance Distribution in YCrCb (detects uncalibrated displays and printed ink).
-    3. Laplacian Blur & Edge Texture Contrast.
+    1. Deep Learning MiniFASNet V2 (ResNet/MobileNet-based anti-spoofing classifier).
+    2. Physical Device Screen Bezel & Glare Detection.
+    3. 2D Fourier Transform High-Frequency Moire Energy.
     4. Multi-frame Eye Micro-Gradient variance & 3D Parallax.
     """
-    def __init__(self):
+    def __init__(self, models_dir: Optional[str] = None):
+        if models_dir is None:
+            models_dir = config.get("paths", "models_dir")
+        self.models_dir = Path(models_dir)
+        self.net = None
         self.face_history: List[np.ndarray] = []
         self.eye_contrast_history: List[float] = []
+
+        # Find model file in configured dir or local fallback
+        candidates = [
+            self.models_dir / "minifasnet_v2.onnx",
+            Path(__file__).resolve().parent.parent / "models" / "minifasnet_v2.onnx",
+            Path("/usr/share/visagesoul/models/minifasnet_v2.onnx"),
+            Path("/opt/visagesoul/models/minifasnet_v2.onnx"),
+        ]
+        for p in candidates:
+            if p.is_file():
+                try:
+                    self.net = cv2.dnn.readNetFromONNX(str(p))
+                    logger.info(f"Loaded MiniFASNet V2 neural anti-spoofing model from {p}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load MiniFASNet model from {p}: {e}")
 
     def reset(self):
         self.face_history.clear()
         self.eye_contrast_history.clear()
+
+    def infer_neural_fas(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
+        """
+        Runs deep neural network inference on face crop using MiniFASNet V2.
+        Returns (is_live, real_probability, classification_reason).
+        """
+        if self.net is None or primary_face is None:
+            return True, 1.0, "IA no disponible"
+
+        try:
+            h_img, w_img, _ = frame_bgr.shape
+            fx, fy, fw, fh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
+            cx, cy = fx + fw // 2, fy + fh // 2
+            scale = 2.7
+            new_w = int(fw * scale)
+            new_h = int(fh * scale)
+            x1 = max(0, cx - new_w // 2)
+            y1 = max(0, cy - new_h // 2)
+            x2 = min(w_img, cx + new_w // 2)
+            y2 = min(h_img, cy + new_h // 2)
+
+            crop = frame_bgr[y1:y2, x1:x2]
+            if crop.size == 0 or crop.shape[0] < 20 or crop.shape[1] < 20:
+                return False, 0.0, "Rostro demasiado pequeño"
+
+            crop_80 = cv2.resize(crop, (80, 80))
+            blob = cv2.dnn.blobFromImage(crop_80, scalefactor=1.0/255.0, size=(80, 80), mean=(0, 0, 0), swapRB=False)
+            self.net.setInput(blob)
+            out = self.net.forward()
+            exp_out = np.exp(out - np.max(out))
+            probs = (exp_out / np.sum(exp_out))[0]
+            p_real = float(probs[0])
+            p_print = float(probs[1])
+            p_screen = float(probs[2])
+
+            # If model predicts spoof (screen or print attack)
+            if p_real < 0.60 or p_screen >= 0.40 or p_print >= 0.40:
+                if p_screen >= p_print:
+                    return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
+                else:
+                    return False, p_real, f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
+
+            return True, p_real, f"Rostro real validado por IA ({p_real*100:.0f}%)"
+        except Exception as e:
+            logger.debug(f"Neural FAS error: {e}")
+            return True, 0.5, str(e)
 
     def analyze_texture(self, face_crop: np.ndarray) -> Tuple[bool, float, str]:
         """
@@ -454,7 +520,12 @@ class AntiSpoofEngine:
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
 
-        # 1. Device Bezel / Screen Framing Check
+        # 1. Deep Learning Neural Anti-Spoofing Inference (MiniFASNet V2)
+        neural_ok, neural_score, neural_msg = self.infer_neural_fas(frame_bgr, primary_face)
+        if not neural_ok:
+            return False, neural_score, neural_msg
+
+        # 2. Device Bezel / Screen Framing Check
         bezel_ok, b_score, b_msg = self.detect_screen_framing(frame_bgr, primary_face)
         if not bezel_ok:
             return False, b_score, b_msg
@@ -468,7 +539,7 @@ class AntiSpoofEngine:
 
         crop = frame_bgr[by:by+bh, bx:bx+bw]
 
-        # 2. Texture & Screen check
+        # 3. Texture & Screen check
         tex_ok, tex_score, tex_msg = self.analyze_texture(crop)
         if not tex_ok:
             return False, tex_score, tex_msg

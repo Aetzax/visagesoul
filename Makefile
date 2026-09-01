@@ -42,7 +42,7 @@ install: all
 
 	# Configuration and faces directory
 	install -d -m 755 $(DESTDIR)$(ETC_DIR)
-	install -d -m 1777 $(DESTDIR)$(ETC_DIR)/faces
+	install -d -m 755 $(DESTDIR)$(ETC_DIR)/faces
 	test -f $(DESTDIR)$(ETC_DIR)/config.ini || install -m 644 config/config.ini $(DESTDIR)$(ETC_DIR)/config.ini
 
 	# Setup Python virtualenv inside /opt/visagesoul (if not already present)
