@@ -787,23 +787,22 @@ class GestureEngine:
                         ring_folded = dist_sq(ring_tip, wrist) < dist_sq(ring_pip, wrist) * 1.15 or dist_sq(ring_tip, ring_mcp) < dist_sq(ring_pip, ring_mcp)
                         pinky_folded = dist_sq(pinky_tip, wrist) < dist_sq(pinky_pip, wrist) * 1.15 or dist_sq(pinky_tip, pinky_mcp) < dist_sq(pinky_pip, pinky_mcp)
 
-                        folded_count = sum([index_folded, middle_folded, ring_folded, pinky_folded])
+                        # Strict Thumb Up: 4 fingers tightly curled into fist, thumb pointing vertically UP
+                        thumb_extended = dist_sq(thumb_tip, wrist) > dist_sq(thumb_mcp, wrist) * 1.15
+                        thumb_pointing_up = (thumb_tip.y < thumb_mcp.y - 0.03) and (thumb_tip.y < wrist.y - 0.06)
 
-                        # Thumb extended & pointing upward/outward
-                        thumb_extended = dist_sq(thumb_tip, wrist) > dist_sq(thumb_mcp, wrist) * 1.05
-                        thumb_above_mcp = (thumb_tip.y < thumb_mcp.y) or (dist_sq(thumb_tip, index_tip) > dist_sq(thumb_mcp, index_mcp) * 1.1)
-
-                        if folded_count >= 3 and thumb_extended and thumb_above_mcp:
+                        if folded_count >= 3 and thumb_extended and thumb_pointing_up:
                             is_geom_thumb = True
 
-                        # Open Palm geometric check: at least 4 fingers extended away from wrist and MCP
-                        index_ext = dist_sq(index_tip, wrist) > dist_sq(index_pip, wrist) * 1.1 and dist_sq(index_tip, wrist) > dist_sq(index_mcp, wrist) * 1.2
-                        middle_ext = dist_sq(middle_tip, wrist) > dist_sq(middle_pip, wrist) * 1.1 and dist_sq(middle_tip, wrist) > dist_sq(middle_mcp, wrist) * 1.2
-                        ring_ext = dist_sq(ring_tip, wrist) > dist_sq(ring_pip, wrist) * 1.1 and dist_sq(ring_tip, wrist) > dist_sq(ring_mcp, wrist) * 1.2
-                        pinky_ext = dist_sq(pinky_tip, wrist) > dist_sq(pinky_pip, wrist) * 1.1 and dist_sq(pinky_tip, wrist) > dist_sq(pinky_mcp, wrist) * 1.2
+                        # Strict Open Palm: 4 fingers extended vertically away from wrist and spread
+                        index_ext = dist_sq(index_tip, wrist) > dist_sq(index_pip, wrist) * 1.2 and dist_sq(index_tip, wrist) > dist_sq(index_mcp, wrist) * 1.3
+                        middle_ext = dist_sq(middle_tip, wrist) > dist_sq(middle_pip, wrist) * 1.2 and dist_sq(middle_tip, wrist) > dist_sq(middle_mcp, wrist) * 1.3
+                        ring_ext = dist_sq(ring_tip, wrist) > dist_sq(ring_pip, wrist) * 1.2 and dist_sq(ring_tip, wrist) > dist_sq(ring_mcp, wrist) * 1.3
+                        pinky_ext = dist_sq(pinky_tip, wrist) > dist_sq(pinky_pip, wrist) * 1.2 and dist_sq(pinky_tip, wrist) > dist_sq(pinky_mcp, wrist) * 1.3
 
                         extended_count = sum([index_ext, middle_ext, ring_ext, pinky_ext])
-                        if extended_count >= 4 and thumb_extended:
+                        palm_facing_up = index_tip.y < wrist.y and middle_tip.y < wrist.y
+                        if extended_count == 4 and thumb_extended and palm_facing_up:
                             is_geom_palm = True
 
                         if is_geom_thumb or is_geom_palm:

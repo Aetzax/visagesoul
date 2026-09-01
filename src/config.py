@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
         "liveness_check": "true",
         "require_thumbs_up": "true",
         "require_gesture": "true",
-        "gesture_type": "both",
+        "gesture_type": "thumb_up",
         "auto_unlock": "true",
         "sound_feedback": "true",
         "sound_volume": "35",
