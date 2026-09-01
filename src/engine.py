@@ -616,6 +616,7 @@ class AntiSpoofEngine:
             # Specular glare check (glass reflections from phone/tablet screens)
             sat_pixels = np.sum(gray >= 253)
             sat_ratio = sat_pixels / float(gray.size)
+            self.last_metrics["specular_ratio"] = float(sat_ratio)
             if sat_ratio > 0.08:  # More than 8% pure white blown-out glare on face
                 self.session_tainted = True
                 self.taint_reason = "Reflejo especular de pantalla detectado"
@@ -634,6 +635,7 @@ class AntiSpoofEngine:
             hf_energy = np.mean(magnitude[ring_mask])
             center_energy = np.mean(magnitude[center_mask])
             ratio = float(hf_energy / max(0.1, center_energy))
+            self.last_metrics["moire_ratio"] = ratio
             
             # Artificial high-frequency Moiré grid resonance
             if ratio > 0.94:
@@ -695,6 +697,16 @@ class GestureEngine:
 
         self.recognizer = None
         self.hand_face_history: List[Tuple[float, float]] = []
+        self.last_metrics: Dict[str, Any] = {
+            "raw_gesture": "None",
+            "raw_score": 0.0,
+            "is_geom_thumb": False,
+            "is_geom_palm": False,
+            "rel_dist": 0.0,
+            "std_dist": 0.0,
+            "mad_dist": 0.0,
+            "reason": "None",
+        }
 
         if self.model_path.is_file():
             try:
@@ -715,6 +727,19 @@ class GestureEngine:
 
     def reset(self):
         self.hand_face_history.clear()
+        self.last_metrics = {
+            "raw_gesture": "None",
+            "raw_score": 0.0,
+            "is_geom_thumb": False,
+            "is_geom_palm": False,
+            "rel_dist": 0.0,
+            "std_dist": 0.0,
+            "mad_dist": 0.0,
+            "reason": "None",
+        }
+
+    def get_last_metrics(self) -> Dict[str, Any]:
+        return dict(self.last_metrics)
 
     def detect_gesture(self, frame_bgr: np.ndarray) -> Tuple[Optional[str], float, bool, bool, Optional[Tuple[float, float]]]:
         """
@@ -790,12 +815,12 @@ class GestureEngine:
 
         return None, 0.0, False, False, None
 
-    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
+    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.60) -> bool:
         """Returns True if a Thumb_Up gesture is detected."""
         gesture, score, is_geom_thumb, _, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
 
-    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.35) -> bool:
+    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.60) -> bool:
         """Returns True if an Open_Palm (🖐️) gesture is detected."""
         gesture, score, _, is_geom_palm, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
@@ -816,7 +841,13 @@ class GestureEngine:
         thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or (is_geom_thumb and score >= 0.40)
         palm_ok = (gesture == "Open_Palm" and score >= min_score) or (is_geom_palm and score >= 0.40)
 
+        self.last_metrics["raw_gesture"] = gesture or "None"
+        self.last_metrics["raw_score"] = float(score)
+        self.last_metrics["is_geom_thumb"] = is_geom_thumb
+        self.last_metrics["is_geom_palm"] = is_geom_palm
+
         if not (thumb_ok or palm_ok):
+            self.last_metrics["reason"] = f"Gesto insuficiente (Raw:{gesture}:{score:.2f})"
             return False, None
 
         # Verify physical hand-face separation and independent biomechanics
@@ -826,10 +857,13 @@ class GestureEngine:
             
             # Relative Euclidean distance normalized by face size
             rel_dist = float(np.sqrt((wrist_px[0] - fc[0])**2 + (wrist_px[1] - fc[1])**2) / face_size)
+            self.last_metrics["rel_dist"] = rel_dist
             
             # Reject hand gripping or touching the phone/photo frame (must be physically separated from face)
             if rel_dist < 0.85:
-                return False, "Mano en borde de pantalla (Sujeción de móvil detectada)"
+                reason = f"Mano en borde de pantalla (Dist:{rel_dist:.2f} < 0.85)"
+                self.last_metrics["reason"] = reason
+                return False, reason
 
             self.hand_face_history.append((rel_dist, 0.0))
             if len(self.hand_face_history) > 16:
@@ -837,27 +871,43 @@ class GestureEngine:
 
             # Warmup: Require at least 4 frames of tracking history before approving
             if len(self.hand_face_history) < 4:
-                return False, "Calibrando gesto..."
+                reason = f"Calibrando gesto ({len(self.hand_face_history)}/4)"
+                self.last_metrics["reason"] = reason
+                return False, reason
 
             dists = [h[0] for h in self.hand_face_history]
             std_dist = float(np.std(dists))
             dist_diffs = [abs(dists[i] - dists[i-1]) for i in range(1, len(dists))]
             mad_dist = float(np.mean(dist_diffs[-3:])) if len(dist_diffs) >= 3 else 0.0
+            self.last_metrics["std_dist"] = std_dist
+            self.last_metrics["mad_dist"] = mad_dist
 
             # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0040, mad_dist < 0.0018)
             # In a living human holding their hand naturally, std_dist >= 0.0120 and mad_dist >= 0.0040
             if std_dist < 0.0080 or mad_dist < 0.0035:
-                return False, "Gesto estático preimpreso detectado"
+                reason = f"Gesto estático en pantalla (StdDist:{std_dist:.4f} < 0.008, MAD:{mad_dist:.4f})"
+                self.last_metrics["reason"] = reason
+                return False, reason
 
         mode_clean = str(mode).lower().strip()
         if mode_clean in ("thumb_up", "thumbs_up", "pulgar", "pulgar_arriba"):
-            return thumb_ok, ("Pulgar Arriba (👍)" if thumb_ok else None)
+            name = "Pulgar Arriba (👍)" if thumb_ok else None
+            self.last_metrics["reason"] = f"Validado: {name}" if thumb_ok else "No coincide modo pulgar"
+            return thumb_ok, name
         elif mode_clean in ("open_palm", "palm", "mano_abierta", "mano"):
-            return palm_ok, ("Mano Abierta (🖐️)" if palm_ok else None)
+            name = "Mano Abierta (🖐️)" if palm_ok else None
+            self.last_metrics["reason"] = f"Validado: {name}" if palm_ok else "No coincide modo palma"
+            return palm_ok, name
         elif mode_clean in ("both", "any", "all", "ambos"):
             if thumb_ok:
+                self.last_metrics["reason"] = "Validado: Pulgar Arriba (👍)"
                 return True, "Pulgar Arriba (👍)"
             if palm_ok:
+                self.last_metrics["reason"] = "Validado: Mano Abierta (🖐️)"
                 return True, "Mano Abierta (🖐️)"
+            self.last_metrics["reason"] = "Gesto no reconocido"
             return False, None
-        return thumb_ok, ("Pulgar Arriba (👍)" if thumb_ok else None)
+        
+        name = "Pulgar Arriba (👍)" if thumb_ok else None
+        self.last_metrics["reason"] = f"Validado: {name}" if thumb_ok else "No coincide modo"
+        return thumb_ok, name

@@ -195,13 +195,22 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
                 gesture_ok = True
                 g_name = "N/A"
+                g_metrics = {}
                 if require_gesture and gesture_engine:
                     gesture_ok, g_name = gesture_engine.is_gesture_valid(frame, mode=gesture_type, primary_face=primary)
+                    g_metrics = gesture_engine.get_last_metrics()
+
+                raw_g = g_metrics.get("raw_gesture", "None")
+                raw_s = g_metrics.get("raw_score", 0.0)
+                g_dist = g_metrics.get("rel_dist", 0.0)
+                g_std = g_metrics.get("std_dist", 0.0)
+                g_reason = g_metrics.get("reason", "N/A")
 
                 logger.debug(
                     f"Frame #{frame_idx:02d}: Match={is_match} ({score:.3f}/{threshold:.2f}) | "
-                    f"Live={liveness_passed} (Neural Real:{p_real*100:.0f}%, Screen:{p_screen*100:.0f}%, Rigidity:{rigidity:.5f}, EyeStd:{eye_std:.2f} -> {liveness_msg}) | "
-                    f"Gesture={gesture_ok} ({g_name}) | Cons={consecutive_matches}/{REQUIRED_CONSECUTIVE_MATCHES}"
+                    f"Live={liveness_passed} (Real:{p_real*100:.0f}%, Screen:{p_screen*100:.0f}%, Rigidity:{rigidity:.5f}, EyeStd:{eye_std:.4f} -> {liveness_msg}) | "
+                    f"Gesture={gesture_ok} (Raw:{raw_g}:{raw_s:.2f}, Dist:{g_dist:.2f}x, StdDist:{g_std:.4f} -> {g_reason}) | "
+                    f"Cons={consecutive_matches}/{REQUIRED_CONSECUTIVE_MATCHES}"
                 )
 
                 if is_match and liveness_passed:
