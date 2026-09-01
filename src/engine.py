@@ -400,17 +400,36 @@ class AntiSpoofEngine:
 
         try:
             h_img, w_img, _ = frame_bgr.shape
-            fx, fy, fw, fh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
-            cx, cy = fx + fw // 2, fy + fh // 2
-            scale = 2.7
-            new_w = int(fw * scale)
-            new_h = int(fh * scale)
-            x1 = max(0, cx - new_w // 2)
-            y1 = max(0, cy - new_h // 2)
-            x2 = min(w_img, cx + new_w // 2)
-            y2 = min(h_img, cy + new_h // 2)
+            x, y, box_w, box_h = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
 
-            crop = frame_bgr[y1:y2, x1:x2]
+            # Exact scale crop from Silent-Face-Anti-Spoofing
+            scale = min((h_img - 1) / max(1, box_h), min((w_img - 1) / max(1, box_w), 2.7))
+            new_width = box_w * scale
+            new_height = box_h * scale
+            center_x, center_y = box_w / 2.0 + x, box_h / 2.0 + y
+
+            left_top_x = center_x - new_width / 2.0
+            left_top_y = center_y - new_height / 2.0
+            right_bottom_x = center_x + new_width / 2.0
+            right_bottom_y = center_y + new_height / 2.0
+
+            if left_top_x < 0:
+                right_bottom_x -= left_top_x
+                left_top_x = 0
+            if left_top_y < 0:
+                right_bottom_y -= left_top_y
+                left_top_y = 0
+            if right_bottom_x > w_img - 1:
+                left_top_x -= right_bottom_x - w_img + 1
+                right_bottom_x = w_img - 1
+            if right_bottom_y > h_img - 1:
+                left_top_y -= right_bottom_y - h_img + 1
+                right_bottom_y = h_img - 1
+
+            x1, y1 = max(0, int(left_top_x)), max(0, int(left_top_y))
+            x2, y2 = min(w_img - 1, int(right_bottom_x)), min(h_img - 1, int(right_bottom_y))
+
+            crop = frame_bgr[y1:y2+1, x1:x2+1]
             if crop.size == 0 or crop.shape[0] < 20 or crop.shape[1] < 20:
                 return False, 0.0, "Rostro demasiado pequeño"
 
@@ -421,190 +440,35 @@ class AntiSpoofEngine:
             exp_out = np.exp(out - np.max(out))
             probs = (exp_out / np.sum(exp_out))[0]
             p_print = float(probs[0])
-            p_real = float(probs[1])  # In MiniFASNet V2, class index 1 is REAL LIVE FACE
-            p_screen = float(probs[2]) # Class index 2 is SCREEN REPLAY ATTACK
+            p_real = float(probs[1])   # Class index 1 is Real Face
+            p_screen = float(probs[2])  # Class index 2 is Screen Attack
             pred_label = int(np.argmax(probs))
 
-            # In Silent-Face-Anti-Spoofing:
-            # Label 1 = Real Face, Label 0 = Print Attack, Label 2 = Screen Attack
-            is_real = (pred_label == 1) and (p_real >= 0.50)
-
-            if not is_real:
-                if p_screen >= p_print:
-                    return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
-                else:
-                    return False, p_real, f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
+            # Flag as attack only when the neural network explicitly classifies as spoof
+            if pred_label == 2 and p_screen >= 0.70:
+                return False, p_real, f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
+            elif pred_label == 0 and p_print >= 0.70:
+                return False, p_real, f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
 
             return True, p_real, f"Rostro real validado por IA ({p_real*100:.0f}%)"
         except Exception as e:
             logger.debug(f"Neural FAS error: {e}")
             return True, 0.5, str(e)
 
-    def analyze_texture(self, face_crop: np.ndarray) -> Tuple[bool, float, str]:
-        """
-        Analyzes a face crop for screen Moire artifacts and texture anomalies.
-        Returns (is_live, score, reason).
-        """
-        if face_crop is None or face_crop.shape[0] < 35 or face_crop.shape[1] < 35:
-            return False, 0.0, "Rostro demasiado pequeño"
-
-        try:
-            gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
-            gray = cv2.resize(gray, (128, 128))
-
-            # 1. Fourier Spectrum Moire Analysis (Screens)
-            f = np.fft.fft2(gray)
-            fshift = np.fft.fftshift(f)
-            mag = 20 * np.log(np.abs(fshift) + 1)
-
-            corner_energy = (
-                np.mean(mag[:20, :20]) + np.mean(mag[:20, -20:]) +
-                np.mean(mag[-20:, :20]) + np.mean(mag[-20:, -20:])
-            ) / 4.0
-            center_energy = np.mean(mag[30:98, 30:98])
-            moire_ratio = float(corner_energy / (center_energy + 1e-6))
-
-            if moire_ratio > 1.30:
-                return False, moire_ratio, "Pantalla digital detectada (Patrón Moire)"
-
-            # 2. Laplacian Blur / Flatness Check
-            lap_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
-            if lap_var < 20.0:
-                return False, lap_var, "Imagen plana/borrosa detectada"
-
-            return True, 1.0, "Textura válida"
-        except Exception as e:
-            return True, 0.5, str(e)
-
-    def detect_screen_framing(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
-        """
-        Detects physical device screen bezels, phone borders, and glass glare spots framing the face.
-        """
-        try:
-            h_img, w_img, _ = frame_bgr.shape
-            fx, fy, fw, fh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
-            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-
-            edges = cv2.Canny(gray, 35, 120)
-            lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=35, minLineLength=max(30, int(fh * 0.5)), maxLineGap=15)
-
-            bezel_left = 0
-            bezel_right = 0
-            bezel_total = 0
-
-            if lines is not None:
-                for l in lines:
-                    x1, y1, x2, y2 = l.flatten()
-                    if abs(x1 - x2) <= 10 and abs(y1 - y2) >= int(fh * 0.45):
-                        avg_x = (x1 + x2) / 2.0
-                        min_y, max_y = min(y1, y2), max(y1, y2)
-                        if min_y <= fy + fh * 1.5 and max_y >= fy - fh * 0.5:
-                            bezel_total += 1
-                            if avg_x < fx + fw * 0.2:
-                                bezel_left += 1
-                            elif avg_x > fx + fw * 0.8:
-                                bezel_right += 1
-
-            thresh_white = (gray >= 250).astype(np.uint8) * 255
-            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(thresh_white)
-            glare_spots = sum(1 for i in range(1, num_labels) if 8 <= stats[i, cv2.CC_STAT_AREA] <= 800)
-
-            if bezel_total >= 3 or (bezel_left >= 1 and bezel_right >= 1) or (glare_spots >= 1 and bezel_total >= 1):
-                return False, float(bezel_total), "Pantalla/móvil detectado (Bordes de pantalla)"
-
-            return True, 0.0, "Sin bordes de pantalla"
-        except Exception as e:
-            return True, 0.0, str(e)
-
     def analyze_frame(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Comprehensive multi-frame liveness verification.
+        Comprehensive liveness verification powered by MiniFASNet V2 neural network.
         Returns (is_live, confidence, description).
         """
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
 
-        # 1. Deep Learning Neural Anti-Spoofing Inference (MiniFASNet V2)
+        # 1. Deep Learning Neural Anti-Spoofing (MiniFASNet V2)
         neural_ok, neural_score, neural_msg = self.infer_neural_fas(frame_bgr, primary_face)
         if not neural_ok:
             return False, neural_score, neural_msg
 
-        # 2. Device Bezel / Screen Framing Check
-        bezel_ok, b_score, b_msg = self.detect_screen_framing(frame_bgr, primary_face)
-        if not bezel_ok:
-            return False, b_score, b_msg
-
-        h_img, w_img, _ = frame_bgr.shape
-        bx, by, bw, bh = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
-        bx = max(0, min(bx, w_img - 1))
-        by = max(0, min(by, h_img - 1))
-        bw = max(1, min(bw, w_img - bx))
-        bh = max(1, min(bh, h_img - by))
-
-        crop = frame_bgr[by:by+bh, bx:bx+bw]
-
-        # 3. Texture & Screen check
-        tex_ok, tex_score, tex_msg = self.analyze_texture(crop)
-        if not tex_ok:
-            return False, tex_score, tex_msg
-
-        # 2. Update tracking history
-        self.face_history.append(primary_face)
-        if len(self.face_history) > 10:
-            self.face_history.pop(0)
-
-        # 3. Eye Micro-Gradient Tracking
-        re_x, re_y = int(primary_face[4]), int(primary_face[5])
-        le_x, le_y = int(primary_face[6]), int(primary_face[7])
-        eye_rad = max(4, int(bw * 0.08))
-
-        def get_eye_grad(ex, ey):
-            ey1, ey2 = max(0, ey - eye_rad), min(h_img, ey + eye_rad)
-            ex1, ex2 = max(0, ex - eye_rad), min(w_img, ex + eye_rad)
-            if ey2 > ey1 and ex2 > ex1:
-                ecrop = cv2.cvtColor(frame_bgr[ey1:ey2, ex1:ex2], cv2.COLOR_BGR2GRAY)
-                sob = cv2.Sobel(ecrop, cv2.CV_64F, 0, 1, ksize=3)
-                return float(np.var(sob))
-            return 0.0
-
-        r_grad = get_eye_grad(re_x, re_y)
-        l_grad = get_eye_grad(le_x, le_y)
-        self.eye_contrast_history.append((r_grad + l_grad) / 2.0)
-        if len(self.eye_contrast_history) > 12:
-            self.eye_contrast_history.pop(0)
-
-        if len(self.face_history) < 4:
-            return False, 0.0, "Analizando tridimensionalidad..."
-
-        # 4. 3D Non-Rigid Parallax Variance
-        yaw_ratios = []
-        tri_ratios = []
-        for f in self.face_history:
-            if len(f) < 14:
-                continue
-            fx_re, fy_re = float(f[4]), float(f[5])
-            fx_le, fy_le = float(f[6]), float(f[7])
-            fx_nt, fy_nt = float(f[8]), float(f[9])
-            fx_rcm, fy_rcm = float(f[10]), float(f[11])
-            fx_lcm, fy_lcm = float(f[12]), float(f[13])
-
-            d_re = np.sqrt((fx_nt - fx_re)**2 + (fy_nt - fy_re)**2)
-            d_le = np.sqrt((fx_nt - fx_le)**2 + (fy_nt - fy_le)**2)
-            yaw = (d_re - d_le) / (d_re + d_le + 1e-6)
-            eye_d = np.sqrt((fx_le - fx_re)**2 + (fy_le - fy_re)**2)
-            mouth_d = np.sqrt((fx_lcm - fx_rcm)**2 + (fy_lcm - fx_rcm)**2)
-            tri = eye_d / (mouth_d + 1e-6)
-
-            yaw_ratios.append(yaw)
-            tri_ratios.append(tri)
-
-        parallax_score = float(np.std(yaw_ratios) + np.std(tri_ratios))
-        eye_var = float(np.std(self.eye_contrast_history)) if len(self.eye_contrast_history) >= 4 else 1.0
-
-        if parallax_score < 0.0010 and eye_var < 2.0:
-            return False, parallax_score, "Foto estática detectada (Sin movimiento 3D)"
-
-        return True, parallax_score, "Rostro 3D Vivo"
+        return True, neural_score, neural_msg
 
 
 class GestureEngine:
