@@ -229,10 +229,10 @@ If you find VisageSoul useful and want to support ongoing development:
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE).
 
-## Referencias Académicas y Arquitectura
+## Academic References & Architecture
 
-La arquitectura de defensa y validación biométrica (Face Anti-Spoofing) de este proyecto está fuertemente alineada e inspirada por las metodologías de fusión (arquitecturas híbridas) detalladas en la investigación académica contemporánea. 
+The biometric defense and validation architecture (Face Anti-Spoofing) of this project is strongly aligned with and inspired by the fusion methodologies (hybrid architectures) detailed in contemporary academic research.
 
-En particular, la combinación de redes neuronales texturales, análisis geométrico de paralaje 3D y retos dinámicos de Liveness activo (parpadeo) sigue directamente las recomendaciones para entornos de hardware limitado (cámaras web RGB estándar) detalladas en:
+In particular, the combination of textural neural networks, 3D parallax geometric analysis, and dynamic active liveness challenges (blinking) directly follows the security recommendations for limited hardware environments (standard RGB webcams) detailed in:
 
 * **Ming, Z., Luqman, M. M., & Burie, J. C. (2020).** *"A Survey On Anti-Spoofing Methods For Face Recognition with RGB Cameras of Generic Consumer Devices"*. arXiv preprint [arXiv:2010.04145](https://arxiv.org/abs/2010.04145).
