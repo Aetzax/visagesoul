@@ -478,15 +478,23 @@ class AntiSpoofEngine:
         std_geom = float(np.std(ratios))
         std_eye = float(np.std(self.eye_dynamics_history))
 
+        # Compute Mean Absolute Delta (MAD) of consecutive frames (defeats placement motion in early buffer)
+        diffs = [abs(ratios[i] - ratios[i-1]) for i in range(1, len(ratios))]
+        mad_geom = float(np.mean(diffs[-4:])) if len(diffs) >= 4 else 0.0
+
+        eye_diffs = [abs(self.eye_dynamics_history[i] - self.eye_dynamics_history[i-1]) for i in range(1, len(self.eye_dynamics_history))]
+        mad_eye = float(np.mean(eye_diffs[-4:])) if len(eye_diffs) >= 4 else 0.0
+
         self.last_metrics["rigidity_score"] = std_geom
+        self.last_metrics["mad_geom"] = mad_geom
         self.last_metrics["eye_std"] = std_eye
 
         # In a 2D photo on a tripod or handheld:
-        # std_geom is <= 0.0035, while a real human has natural 3D micro-pitch/yaw where std_geom >= 0.0200.
-        # std_eye is <= 0.0008, while living eyes have saccades/blinks where std_eye >= 0.0100.
-        if std_geom < 0.0080:
+        # std_geom < 0.0080 or mad_geom < 0.0030 (consecutive frame-to-frame delta is near 0 in a photo)
+        # std_eye < 0.0020 or mad_eye < 0.0005 (eyes do not twitch or blink in a photo)
+        if std_geom < 0.0080 or mad_geom < 0.0030:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
-        if std_eye < 0.0020:
+        if std_eye < 0.0020 or mad_eye < 0.0005:
             return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
 
         return True, 1.0, "Rostro 3D Vivo"
@@ -763,7 +771,14 @@ class GestureEngine:
                 vx = [h[0] for h in self.hand_face_history]
                 vy = [h[1] for h in self.hand_face_history]
                 std_hand = float(np.sqrt(np.std(vx)**2 + np.std(vy)**2))
-                if std_hand < 0.0050:
+
+                hand_diffs = [
+                    np.sqrt((vx[i] - vx[i-1])**2 + (vy[i] - vy[i-1])**2)
+                    for i in range(1, len(vx))
+                ]
+                mad_hand = float(np.mean(hand_diffs[-3:])) if len(hand_diffs) >= 3 else 0.0
+
+                if std_hand < 0.0050 or mad_hand < 0.0035:
                     return False, "Gesto estático preimpreso detectado"
 
         mode_clean = str(mode).lower().strip()
