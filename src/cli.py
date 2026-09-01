@@ -244,43 +244,43 @@ def cmd_test(args):
 
                 if is_match and not liveness_ok:
                     consecutive_test_matches = 0
-                    box_color = (0, 140, 255)
-                    bar_color = (0, 70, 180)
-                    score_text = f"[!] ALERTA: {liveness_msg}"
+                    box_color = (0, 0, 255)
+                    bar_color = (20, 20, 180)
+                    score_text = f"[⛔ DENEGADO / FOTO] {liveness_msg}"
                 elif is_match and liveness_ok:
                     if require_gesture:
                         if gesture_valid:
                             consecutive_test_matches += 1
                             if consecutive_test_matches >= 5:
                                 box_color = (0, 255, 0)
-                                bar_color = (20, 120, 20)
-                                clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
-                                score_text = f"[OK] AUTORIZADO: {username} ({pct}%) + {clean_gesture_name}"
+                                bar_color = (20, 140, 20)
+                                clean_gesture_name = "Pulgar Arriba (👍)" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta (🖐️)" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
+                                score_text = f"[✓ AUTORIZADO] {username} ({pct}%) + {clean_gesture_name}"
                             else:
                                 box_color = (0, 255, 200)
                                 bar_color = (0, 100, 140)
-                                score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/5)..."
+                                score_text = f"[⏳ VALIDANDO] Mantén el gesto ({consecutive_test_matches}/5)..."
                         else:
-                            consecutive_test_matches = max(0, consecutive_test_matches - 1)
-                            box_color = (0, 200, 255)
-                            bar_color = (140, 100, 0)
-                            hint = "Pulgar o Mano abierta" if gesture_mode == "both" else ("Mano abierta" if gesture_mode == "open_palm" else "Pulgar arriba")
-                            score_text = f"[OK] Rostro 3D Vivo ({pct}%) -> Muestra {hint}"
+                            consecutive_test_matches = 0
+                            box_color = (0, 165, 255)
+                            bar_color = (0, 80, 160)
+                            hint = "Pulgar (👍) o Mano (🖐️)" if gesture_mode == "both" else ("Mano Abierta (🖐️)" if gesture_mode == "open_palm" else "Pulgar Arriba (👍)")
+                            score_text = f"[✋ GESTO REQUERIDO] Muestra {hint}"
                     else:
                         consecutive_test_matches += 1
                         if consecutive_test_matches >= 5:
                             box_color = (0, 255, 0)
-                            bar_color = (20, 120, 20)
-                            score_text = f"[OK] AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
+                            bar_color = (20, 140, 20)
+                            score_text = f"[✓ AUTORIZADO] {username} ({pct}% similitud)"
                         else:
                             box_color = (0, 255, 200)
                             bar_color = (0, 100, 140)
-                            score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/5)..."
+                            score_text = f"[⏳ VALIDANDO] Verificando estabilidad ({consecutive_test_matches}/5)..."
                 else:
                     consecutive_test_matches = 0
                     box_color = (0, 0, 255)
-                    bar_color = (20, 20, 120)
-                    score_text = f"[X] NO COINCIDE ({pct}% / req {int(threshold*100)}%)"
+                    bar_color = (20, 20, 140)
+                    score_text = f"[X NO COINCIDE] ({pct}% / req {int(threshold*100)}%)"
 
             cv2.rectangle(display_frame, (0, 0), (w, 60), bar_color, -1)
             cv2.putText(display_frame, score_text, (20, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (255, 255, 255), 2)
