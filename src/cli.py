@@ -300,8 +300,8 @@ def cmd_test(args):
         eye_std = metrics.get("eye_std", 0.0)
 
         cv2.rectangle(display_frame, (0, h - 55), (w, h), (15, 15, 15), -1)
-        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.020)"
-        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.002) | Consenso: {consecutive_test_matches}/8 | Gesto: {gesture_name}"
+        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.012)"
+        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.001) | Consenso: {consecutive_test_matches}/5 | Gesto: {gesture_name}"
         cv2.putText(display_frame, hud_line1, (15, h - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
         cv2.putText(display_frame, hud_line2, (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200) if gesture_valid else (180, 180, 180), 1)
 
