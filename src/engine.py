@@ -615,10 +615,10 @@ class AntiSpoofEngine:
             gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
             
             # Specular glare check (glass reflections from phone/tablet screens) - AGGRESSIVE
-            sat_pixels = np.sum(gray >= 240)
+            sat_pixels = np.sum(gray >= 253)
             sat_ratio = sat_pixels / float(gray.size)
             self.last_metrics["specular_ratio"] = float(sat_ratio)
-            if sat_ratio > 0.04:  # More than 4% bright glare on face (typical of screens)
+            if sat_ratio > 0.08:  # More than 4% bright glare on face (typical of screens)
                 self.session_tainted = True
                 self.taint_reason = "Reflejo especular de pantalla detectado"
                 return False, self.taint_reason
