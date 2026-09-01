@@ -39,6 +39,20 @@ if [ -d "/etc/aura-auth/faces" ] && [ -n "$(ls -A /etc/aura-auth/faces 2>/dev/nu
     cp -n /etc/aura-auth/faces/*.json /etc/visagesoul/faces/ 2>/dev/null || true
 fi
 
+ENABLE_DEBUG=false
+for arg in "$@"; do
+    if [ "$arg" == "--debug" ] || [ "$arg" == "-d" ]; then
+        ENABLE_DEBUG=true
+    fi
+done
+
+if [ "$ENABLE_DEBUG" = true ]; then
+    echo -e "  -> Modo de depuración activado: Los logs se guardarán en /tmp/visagesoul_verify.log"
+    sed -i 's/^debug\s*=.*/debug = true/' /etc/visagesoul/config.ini 2>/dev/null || true
+else
+    sed -i 's/^debug\s*=.*/debug = false/' /etc/visagesoul/config.ini 2>/dev/null || true
+fi
+
 chmod 755 /etc/visagesoul
 chmod 644 /etc/visagesoul/config.ini 2>/dev/null || true
 chmod 755 /etc/visagesoul/faces

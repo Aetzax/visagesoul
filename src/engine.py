@@ -569,22 +569,29 @@ class AntiSpoofEngine:
             max_print = max(self.print_scores_history)
             avg_print = sum(self.print_scores_history) / len(self.print_scores_history)
             avg_real = sum(self.real_scores_history) / len(self.real_scores_history)
-
             self.last_metrics["p_real"] = p_real
             self.last_metrics["p_screen"] = p_screen
             self.last_metrics["p_print"] = p_print
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # Multi-frame persistent confirmation for Neural Anti-Spoofing:
-            # Requires persistent attack energy across buffer (both avg >= 0.35 and max >= 0.50),
-            # preventing 1-frame boundary noise or lighting transitions from false-flagging real users
+            # 1. Instant Spike Taint Lock (Screen or Print attack spike >= 0.60 on any frame)
+            if p_screen >= 0.60:
+                self.session_tainted = True
+                self.taint_reason = f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
+                return False, avg_real, self.taint_reason
+            elif p_print >= 0.60:
+                self.session_tainted = True
+                self.taint_reason = f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
+                return False, avg_real, self.taint_reason
+
+            # 2. Multi-frame persistent confirmation for Neural Anti-Spoofing:
             if len(self.real_scores_history) >= 4:
-                if avg_screen >= 0.35 and max_screen >= 0.50:
+                if avg_screen >= 0.30 and max_screen >= 0.45:
                     self.session_tainted = True
                     self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
                     return False, avg_real, self.taint_reason
-                elif avg_print >= 0.35 and max_print >= 0.50:
+                elif avg_print >= 0.30 and max_print >= 0.45:
                     self.session_tainted = True
                     self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
                     return False, avg_real, self.taint_reason
@@ -594,20 +601,73 @@ class AntiSpoofEngine:
             logger.debug(f"Neural FAS error: {e}")
             return True, 0.5, str(e)
 
+    def check_screen_texture_and_specular(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, str]:
+        """
+        Detects digital screen sub-pixel grid patterns (Moiré) and flat glass specular reflections.
+        """
+        try:
+            x, y, w, h = int(primary_face[0]), int(primary_face[1]), int(primary_face[2]), int(primary_face[3])
+            face_crop = frame_bgr[max(0, y):min(frame_bgr.shape[0], y+h), max(0, x):min(frame_bgr.shape[1], x+w)]
+            if face_crop.size == 0 or face_crop.shape[0] < 40 or face_crop.shape[1] < 40:
+                return True, "OK"
+
+            gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+            
+            # Specular glare check (glass reflections from phone/tablet screens)
+            sat_pixels = np.sum(gray >= 253)
+            sat_ratio = sat_pixels / float(gray.size)
+            if sat_ratio > 0.08:  # More than 8% pure white blown-out glare on face
+                self.session_tainted = True
+                self.taint_reason = "Reflejo especular de pantalla detectado"
+                return False, self.taint_reason
+
+            # 2D Fast Fourier Transform for periodic Moiré grid lines
+            f_transform = np.fft.fft2(cv2.resize(gray, (96, 96)))
+            f_shift = np.fft.fftshift(f_transform)
+            magnitude = np.log(np.abs(f_shift) + 1e-5)
+            
+            crow, ccol = 48, 48
+            y_idx, x_idx = np.ogrid[:96, :96]
+            ring_mask = ((x_idx - ccol)**2 + (y_idx - crow)**2 >= 20**2) & ((x_idx - ccol)**2 + (y_idx - crow)**2 <= 42**2)
+            center_mask = ((x_idx - ccol)**2 + (y_idx - crow)**2 < 12**2)
+            
+            hf_energy = np.mean(magnitude[ring_mask])
+            center_energy = np.mean(magnitude[center_mask])
+            ratio = float(hf_energy / max(0.1, center_energy))
+            
+            # Artificial high-frequency Moiré grid resonance
+            if ratio > 0.94:
+                self.session_tainted = True
+                self.taint_reason = "Patrón Moiré de pantalla digital detectado"
+                return False, self.taint_reason
+
+            return True, "OK"
+        except Exception:
+            return True, "OK"
+
     def analyze_frame(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Comprehensive liveness verification powered by MiniFASNet V2 neural network and 3D parallax analysis.
+        Comprehensive liveness verification powered by MiniFASNet V2 neural network, 3D parallax analysis,
+        and digital screen Moiré / glass reflection detection.
         Returns (is_live, confidence, description).
         """
+        if self.session_tainted:
+            return False, 0.0, self.taint_reason
+
         if primary_face is None:
             return False, 0.0, "Esperando rostro..."
 
-        # 1. 3D Projective Invariance & Living Dynamics Check (detects static 2D photos)
+        # 1. Digital Screen Moiré & Glass Specular Reflection Check
+        tex_ok, tex_reason = self.check_screen_texture_and_specular(frame_bgr, primary_face)
+        if not tex_ok:
+            return False, 0.0, tex_reason
+
+        # 2. 3D Projective Invariance & Living Dynamics Check (detects static 2D photos)
         rigidity_ok, rigidity_val, rigidity_msg = self.check_3d_rigidity(frame_bgr, primary_face)
         if not rigidity_ok:
             return False, rigidity_val, rigidity_msg
 
-        # 2. Deep Learning Neural Anti-Spoofing (MiniFASNet V2)
+        # 3. Deep Learning Neural Anti-Spoofing (MiniFASNet V2)
         neural_ok, neural_score, neural_msg = self.infer_neural_fas(frame_bgr, primary_face)
         if not neural_ok:
             return False, neural_score, neural_msg

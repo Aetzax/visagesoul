@@ -94,11 +94,12 @@ def reset_attempts(username: str):
 
 
 def verify_user(username: str, timeout: float = None, threshold: float = None, device_path: str = None, debug: bool = False, require_thumbs_up: bool = None, gesture_type: str = None) -> int:
-    log_file = config.get("paths", "log_file", "/var/log/visagesoul/auth.log")
-    logger = setup_logger("visagesoul-verify", debug=True, log_file="/tmp/visagesoul_verify.log")
+    is_debug = debug or config.getboolean("pam", "debug", False)
+    log_file = "/tmp/visagesoul_verify.log" if is_debug else None
+    logger = setup_logger("visagesoul-verify", debug=is_debug, log_file=log_file)
 
     if timeout is None:
-        timeout = config.getfloat("security", "timeout", 4.0)
+        timeout = config.getfloat("security", "timeout", 4.5)
     if threshold is None:
         threshold = config.getfloat("security", "threshold", 0.70)
     if device_path is None:
@@ -148,7 +149,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     height = config.getint("camera", "height", 720)
     fourcc = config.get("camera", "fourcc", "MJPG")
     fps = config.getint("camera", "fps", 30)
-    warmup_frames = config.getint("camera", "warmup_frames", 5)
+    warmup_frames = config.getint("camera", "warmup_frames", 6)
 
     cap = open_camera(device_path, width, height, fourcc, fps)
     if cap is None:
@@ -163,7 +164,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
         start_time = time.time()
         consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 6
+        REQUIRED_CONSECUTIVE_MATCHES = 8
         frame_idx = 0
 
         while (time.time() - start_time) < timeout:
