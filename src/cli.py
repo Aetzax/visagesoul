@@ -251,7 +251,7 @@ def cmd_test(args):
                     if require_gesture:
                         if gesture_valid:
                             consecutive_test_matches += 1
-                            if consecutive_test_matches >= 3:
+                            if consecutive_test_matches >= 4:
                                 box_color = (0, 255, 0)
                                 bar_color = (20, 120, 20)
                                 clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
@@ -259,7 +259,7 @@ def cmd_test(args):
                             else:
                                 box_color = (0, 255, 200)
                                 bar_color = (0, 100, 140)
-                                score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/3)..."
+                                score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/4)..."
                         else:
                             consecutive_test_matches = max(0, consecutive_test_matches - 1)
                             box_color = (0, 200, 255)
@@ -268,14 +268,14 @@ def cmd_test(args):
                             score_text = f"[OK] Rostro 3D Vivo ({pct}%) -> Muestra {hint}"
                     else:
                         consecutive_test_matches += 1
-                        if consecutive_test_matches >= 3:
+                        if consecutive_test_matches >= 4:
                             box_color = (0, 255, 0)
                             bar_color = (20, 120, 20)
                             score_text = f"[OK] AUTORIZADO: {username} ({pct}% similitud | 3D Vivo)"
                         else:
                             box_color = (0, 255, 200)
                             bar_color = (0, 100, 140)
-                            score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/3)..."
+                            score_text = f"[OK] Verificando estabilidad biométrica ({consecutive_test_matches}/4)..."
                 else:
                     consecutive_test_matches = 0
                     box_color = (0, 0, 255)
@@ -314,8 +314,8 @@ def cmd_test(args):
         eye_std = metrics.get("eye_std", 0.0)
 
         cv2.rectangle(display_frame, (0, h - 55), (w, h), (15, 15, 15), -1)
-        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.008)"
-        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.0008) | Consenso: {consecutive_test_matches}/3 | Gesto: {gesture_name}"
+        hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.006)"
+        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.0004) | Consenso: {consecutive_test_matches}/4 | Gesto: {gesture_name}"
         cv2.putText(display_frame, hud_line1, (15, h - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
         cv2.putText(display_frame, hud_line2, (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200) if gesture_valid else (180, 180, 180), 1)
 

@@ -376,8 +376,8 @@ class AntiSpoofEngine:
         self.real_scores_history: List[float] = []
         self.screen_scores_history: List[float] = []
         self.print_scores_history: List[float] = []
-        self.attack_lock_cooldown: int = 0
-        self.attack_reason: str = ""
+        self.session_tainted: bool = False
+        self.taint_reason: str = ""
         self.last_metrics: Dict[str, Any] = {
             "rigidity_score": 0.0,
             "eye_std": 0.0,
@@ -410,8 +410,8 @@ class AntiSpoofEngine:
         self.real_scores_history.clear()
         self.screen_scores_history.clear()
         self.print_scores_history.clear()
-        self.attack_lock_cooldown = 0
-        self.attack_reason = ""
+        self.session_tainted = False
+        self.taint_reason = ""
         self.last_metrics = {
             "rigidity_score": 0.0,
             "eye_std": 0.0,
@@ -427,6 +427,9 @@ class AntiSpoofEngine:
         Detects 2D flat photographs (printed or on screens) using projective landmark invariance and normalized eye dynamics.
         A 2D photo maintains near-zero affine ratio variation even under hand tremor / shaking.
         """
+        if self.session_tainted:
+            return False, 0.0, self.taint_reason
+
         if primary_face is None or len(primary_face) < 14:
             return False, 0.0, "Sin rostro"
 
@@ -483,15 +486,14 @@ class AntiSpoofEngine:
 
     def infer_neural_fas(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Runs deep neural network inference on face crop using MiniFASNet V2 with rolling temporal consensus and attack cooldown.
+        Runs deep neural network inference on face crop using MiniFASNet V2 with rolling temporal consensus.
         Returns (is_live, real_probability, classification_reason).
         """
+        if self.session_tainted:
+            return False, 0.0, self.taint_reason
+
         if self.net is None or primary_face is None:
             return True, 1.0, "IA no disponible"
-
-        if self.attack_lock_cooldown > 0:
-            self.attack_lock_cooldown -= 1
-            return False, 0.0, self.attack_reason
 
         try:
             h_img, w_img, _ = frame_bgr.shape
@@ -538,7 +540,7 @@ class AntiSpoofEngine:
             p_real = float(probs[1])   # Class index 1 is Real Face
             p_screen = float(probs[2])  # Class index 2 is Screen Attack
 
-            # Track rolling history (window of 5 frames)
+            # Track rolling history (window of 6 frames)
             self.real_scores_history.append(p_real)
             self.screen_scores_history.append(p_screen)
             self.print_scores_history.append(p_print)
@@ -559,15 +561,16 @@ class AntiSpoofEngine:
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # If any significant screen energy exists in the rolling buffer, trigger attack persistence lock
-            if p_screen >= 0.40 or max_screen >= 0.40 or avg_screen >= 0.25:
-                self.attack_lock_cooldown = 15
-                self.attack_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
-                return False, avg_real, self.attack_reason
-            elif p_print >= 0.40 or max_print >= 0.40 or avg_print >= 0.25:
-                self.attack_lock_cooldown = 15
-                self.attack_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
-                return False, avg_real, self.attack_reason
+            # Living humans in real rooms have p_screen < 0.05 and p_print < 0.05
+            # If screen energy reaches 0.15 or print reaches 0.15, taint the session permanently
+            if p_screen >= 0.15 or max_screen >= 0.20 or avg_screen >= 0.15:
+                self.session_tainted = True
+                self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
+                return False, avg_real, self.taint_reason
+            elif p_print >= 0.15 or max_print >= 0.20 or avg_print >= 0.15:
+                self.session_tainted = True
+                self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
+                return False, avg_real, self.taint_reason
 
             return True, avg_real, f"Rostro real validado por IA ({avg_real*100:.0f}%)"
         except Exception as e:
