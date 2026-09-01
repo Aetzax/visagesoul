@@ -376,6 +376,8 @@ class AntiSpoofEngine:
         self.real_scores_history: List[float] = []
         self.screen_scores_history: List[float] = []
         self.print_scores_history: List[float] = []
+        self.attack_lock_cooldown: int = 0
+        self.attack_reason: str = ""
         self.last_metrics: Dict[str, Any] = {
             "rigidity_score": 0.0,
             "eye_std": 0.0,
@@ -408,6 +410,8 @@ class AntiSpoofEngine:
         self.real_scores_history.clear()
         self.screen_scores_history.clear()
         self.print_scores_history.clear()
+        self.attack_lock_cooldown = 0
+        self.attack_reason = ""
         self.last_metrics = {
             "rigidity_score": 0.0,
             "eye_std": 0.0,
@@ -469,19 +473,25 @@ class AntiSpoofEngine:
         self.last_metrics["rigidity_score"] = std_geom
         self.last_metrics["eye_std"] = std_eye
 
-        # In a 2D photo (even hand-held), std_geom is <= 0.0050 and std_eye is <= 0.0004
-        if std_geom < 0.0080 and std_eye < 0.0008:
+        # In a 2D photo, eyes are frozen (std_eye < 0.0004) or geometry is flat (std_geom < 0.0060)
+        if std_eye < 0.0004:
+            return False, std_geom, "Foto 2D estática detectada (Ojos congelados)"
+        if std_geom < 0.0060:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
 
         return True, 1.0, "Rostro 3D Vivo"
 
     def infer_neural_fas(self, frame_bgr: np.ndarray, primary_face: np.ndarray) -> Tuple[bool, float, str]:
         """
-        Runs deep neural network inference on face crop using MiniFASNet V2 with rolling temporal consensus.
+        Runs deep neural network inference on face crop using MiniFASNet V2 with rolling temporal consensus and attack cooldown.
         Returns (is_live, real_probability, classification_reason).
         """
         if self.net is None or primary_face is None:
             return True, 1.0, "IA no disponible"
+
+        if self.attack_lock_cooldown > 0:
+            self.attack_lock_cooldown -= 1
+            return False, 0.0, self.attack_reason
 
         try:
             h_img, w_img, _ = frame_bgr.shape
@@ -549,11 +559,15 @@ class AntiSpoofEngine:
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # If any significant screen energy exists in the rolling buffer
-            if max_screen >= 0.55 or avg_screen >= 0.35:
-                return False, avg_real, f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
-            elif max_print >= 0.55 or avg_print >= 0.35:
-                return False, avg_real, f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
+            # If any significant screen energy exists in the rolling buffer, trigger attack persistence lock
+            if p_screen >= 0.40 or max_screen >= 0.40 or avg_screen >= 0.25:
+                self.attack_lock_cooldown = 15
+                self.attack_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
+                return False, avg_real, self.attack_reason
+            elif p_print >= 0.40 or max_print >= 0.40 or avg_print >= 0.25:
+                self.attack_lock_cooldown = 15
+                self.attack_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
+                return False, avg_real, self.attack_reason
 
             return True, avg_real, f"Rostro real validado por IA ({avg_real*100:.0f}%)"
         except Exception as e:
