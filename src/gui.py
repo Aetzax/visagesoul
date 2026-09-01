@@ -674,18 +674,42 @@ class MainWindow(QMainWindow):
         layout.addWidget(pam_group)
 
         # Unlock Rules & Gestures
-        sec_group = QGroupBox(tr("security_rules_group"))
+        sec_group = QGroupBox("🛡️ Parámetros de Verificación y Seguridad Biométrica")
         s_form = QFormLayout(sec_group)
+
+        self.chk_liveness = QCheckBox("Detección de Vida Activa (IA Neuronal + 3D + Moiré)")
+        self.chk_liveness.setChecked(config.getboolean("security", "liveness_check", True))
+        s_form.addRow("Filtros Anti-Spoofing:", self.chk_liveness)
+
+        self.lbl_liveness_danger = QLabel("🚨 PELIGRO: Desactivar los filtros de vida permitirá el acceso con cualquier foto plana.")
+        self.lbl_liveness_danger.setStyleSheet("color: #f7768e; font-size: 11px; font-weight: bold;")
+        self.lbl_liveness_danger.setWordWrap(True)
+        self.lbl_liveness_danger.setVisible(not self.chk_liveness.isChecked())
+        self.chk_liveness.toggled.connect(lambda on: self.lbl_liveness_danger.setVisible(not on))
+        s_form.addRow("", self.lbl_liveness_danger)
+
+        self.spin_threshold = QDoubleSpinBox()
+        self.spin_threshold.setRange(0.50, 0.95)
+        self.spin_threshold.setSingleStep(0.01)
+        self.spin_threshold.setValue(config.getfloat("security", "threshold", 0.70))
+        s_form.addRow("Umbral de Similitud Facial:", self.spin_threshold)
+
+        self.spin_timeout = QDoubleSpinBox()
+        self.spin_timeout.setRange(1.0, 15.0)
+        self.spin_timeout.setSingleStep(0.5)
+        self.spin_timeout.setValue(config.getfloat("security", "timeout", 4.5))
+        s_form.addRow("Tiempo de Verificación (s):", self.spin_timeout)
 
         self.chk_thumbs_up = QCheckBox(tr("chk_thumbs_up"))
         is_gesture_on = config.getboolean("security", "require_gesture", config.getboolean("security", "require_thumbs_up", True))
         self.chk_thumbs_up.setChecked(is_gesture_on)
-        s_form.addRow("Doble Factor Gestual:", self.chk_thumbs_up)
+        s_form.addRow("Doble Factor Gestual (2FA):", self.chk_thumbs_up)
 
         self.lbl_gesture_warning = QLabel("⚠️ Advertencia: Desactivar el gesto reduce la protección contra ataques de fotos o vídeos en mano.")
         self.lbl_gesture_warning.setStyleSheet("color: #ff9e64; font-size: 11px; font-style: italic;")
         self.lbl_gesture_warning.setWordWrap(True)
         self.lbl_gesture_warning.setVisible(not is_gesture_on)
+        self.chk_thumbs_up.toggled.connect(lambda on: self.lbl_gesture_warning.setVisible(not on))
         s_form.addRow("", self.lbl_gesture_warning)
 
         self.combo_gesture_type = QComboBox()
@@ -698,7 +722,6 @@ class MainWindow(QMainWindow):
             self.combo_gesture_type.setCurrentIndex(idx)
         self.combo_gesture_type.setEnabled(is_gesture_on)
         self.chk_thumbs_up.toggled.connect(self.combo_gesture_type.setEnabled)
-        self.chk_thumbs_up.toggled.connect(lambda on: self.lbl_gesture_warning.setVisible(not on))
         s_form.addRow(tr("gesture_type_label"), self.combo_gesture_type)
 
         self.chk_auto_unlock = QCheckBox(tr("chk_auto_unlock"))
@@ -748,9 +771,12 @@ class MainWindow(QMainWindow):
 
     def save_security_settings(self):
         # 1. Update config values
+        config.set("security", "liveness_check", "true" if self.chk_liveness.isChecked() else "false")
+        config.set("security", "threshold", f"{self.spin_threshold.value():.2f}")
+        config.set("security", "timeout", f"{self.spin_timeout.value():.1f}")
         config.set("security", "require_thumbs_up", "true" if self.chk_thumbs_up.isChecked() else "false")
         config.set("security", "require_gesture", "true" if self.chk_thumbs_up.isChecked() else "false")
-        config.set("security", "gesture_type", self.combo_gesture_type.currentData() or "thumb_up")
+        config.set("security", "gesture_type", self.combo_gesture_type.currentData() or "both")
         config.set("security", "auto_unlock", "true" if self.chk_auto_unlock.isChecked() else "false")
         config.set("security", "max_attempts", self.spin_max_attempts.value())
         config.set("pam", "notify", "true" if self.chk_pam_notify.isChecked() else "false")
@@ -804,21 +830,14 @@ class MainWindow(QMainWindow):
             self.combo_device.addItem(f"{d['path']} ({d['name']})", d["path"])
         c_form.addRow(tr("cam_device_label"), self.combo_device)
 
-        self.spin_threshold = QDoubleSpinBox()
-        self.spin_threshold.setRange(0.50, 0.95)
-        self.spin_threshold.setSingleStep(0.05)
-        self.spin_threshold.setValue(config.getfloat("security", "threshold", 0.70))
-        c_form.addRow(tr("threshold_label"), self.spin_threshold)
-
-        self.spin_timeout = QDoubleSpinBox()
-        self.spin_timeout.setRange(1.0, 15.0)
-        self.spin_timeout.setSingleStep(0.5)
-        self.spin_timeout.setValue(config.getfloat("security", "timeout", 4.0))
-        c_form.addRow(tr("timeout_label"), self.spin_timeout)
+        self.spin_warmup = QSpinBox()
+        self.spin_warmup.setRange(0, 30)
+        self.spin_warmup.setValue(config.getint("camera", "warmup_frames", 6))
+        c_form.addRow("Fotogramas de Calentamiento:", self.spin_warmup)
 
         self.chk_low_light = QCheckBox(tr("chk_low_light"))
         self.chk_low_light.setChecked(config.getboolean("camera", "low_light_boost", True))
-        c_form.addRow("Mejora de Imagen:", self.chk_low_light)
+        c_form.addRow("Mejora de Imagen (CLAHE):", self.chk_low_light)
 
         layout.addWidget(cam_group)
 
