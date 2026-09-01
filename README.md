@@ -34,11 +34,11 @@ VisageSoul incorporates a multi-tiered defense-in-depth security pipeline to def
    - Evaluates real face probability vs. print and screen attack likelihood on every frame.
 
 2. **3D Facial Geometry & Projective Parallax Analysis**:
-   - Computes non-linear aspect ratios across the eye-to-nose-to-mouth triangular plane ($req \ge 0.020$).
+   - Computes non-linear aspect ratios across the eye-to-nose-to-mouth triangular plane (`req >= 0.020`).
    - Real 3D convex faces exhibit continuous out-of-plane parallax during natural postural sway, whereas flat 2D photographs (mounted on tripods or held in hand) behave as rigid affine planes with zero depth perspective.
 
 3. **Canonical Aligned Eye Dynamics & Micro-Saccades**:
-   - Performs canonical affine face rectification and measures high-frequency Sobel variance across the eye band ($std \ge 0.003, mad \ge 0.001$).
+   - Performs canonical affine face rectification and measures high-frequency Sobel variance across the eye band (`std >= 0.003, mad >= 0.001`).
    - Rejects frozen eyelids, static photo eyes, and printed portraits lacking natural micro-saccadic eye movement.
 
 4. **2D Fast Fourier Transform (FFT) Moiré & Glass Specular Reflection**:
@@ -46,12 +46,12 @@ VisageSoul incorporates a multi-tiered defense-in-depth security pipeline to def
    - Detects harsh specular glare and glass reflections typical of smartphone and tablet screens.
 
 5. **Biomechanical Decoupling (Independent Face & Hand Micro-Tremor)**:
-   - Tracks the normalized Euclidean distance vector $D(t) = \frac{\|\vec{P}_{\text{wrist}}(t) - \vec{P}_{\text{face}}(t)\|}{w_{\text{face}}}$ between the facial center and the hand wrist.
-   - **Handheld photo attacks**: The printed face and printed hand are fixed on the exact same piece of glass; shaking the phone moves both in identical synchrony ($\text{std\_dist} < 0.010$).
-   - **Real living humans**: The arm neuromuscular tremor (8–12 Hz) is physically independent of neck/head postural sway ($\text{std\_dist} \ge 0.020, \text{mad\_dist} \ge 0.012$), verifying independent biomechanical life.
+   - Tracks the normalized Euclidean distance vector `D(t) = ||P_wrist(t) - P_face(t)|| / face_size` between the facial center and the hand wrist.
+   - **Handheld photo attacks**: The printed face and printed hand are fixed on the exact same piece of glass; shaking the phone moves both in identical synchrony (`std_dist < 0.010`).
+   - **Real living humans**: The arm neuromuscular tremor (8–12 Hz) is physically independent of neck/head postural sway (`std_dist >= 0.020, mad_dist >= 0.012`), verifying independent biomechanical life.
 
 6. **Instant Attack Spike Lockout & Session Taint**:
-   - If an attack pattern or screen spike is detected in any frame ($p \ge 60\%$), the session is marked as permanently tainted (`session_tainted = True`). The attempt is immediately aborted and forces standard password entry.
+   - If an attack pattern or screen spike is detected in any frame (`p >= 60%`), the session is marked as permanently tainted (`session_tainted = True`). The attempt is immediately aborted and forces standard password entry.
 
 ---
 
