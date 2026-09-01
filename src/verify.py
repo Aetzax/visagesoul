@@ -161,8 +161,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
         start_time = time.time()
         consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 2
-        face_history = []
+        REQUIRED_CONSECUTIVE_MATCHES = 3
 
         while (time.time() - start_time) < timeout:
             ret, frame = cap.read()
@@ -207,7 +206,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                                         pass
                                 return 0
                         else:
-                            consecutive_matches = max(0, consecutive_matches - 1)
+                            consecutive_matches = 0
                     else:
                         consecutive_matches += 1
                         if consecutive_matches >= REQUIRED_CONSECUTIVE_MATCHES:
@@ -222,7 +221,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
                                     pass
                             return 0
                 else:
-                    consecutive_matches = max(0, consecutive_matches - 1)
+                    consecutive_matches = 0
 
             time.sleep(0.02)
 
