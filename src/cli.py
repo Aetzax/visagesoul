@@ -287,6 +287,8 @@ def cmd_test(args):
             cv2.rectangle(display_frame, (mirrored_bx, by), (mirrored_bx + bw, by + bh), box_color, 2)
         else:
             consecutive_test_matches = 0
+            engine.antispoof.reset()
+            gesture_engine.reset()
             cv2.rectangle(display_frame, (0, 0), (w, 60), (40, 40, 40), -1)
             cv2.putText(display_frame, "Buscando rostro...", (20, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (180, 180, 180), 2)
 
@@ -305,7 +307,11 @@ def cmd_test(args):
 
         cv2.imshow(window_name, display_frame)
         key = cv2.waitKey(1) & 0xFF
-        if key in [ord('q'), ord('Q'), 27] or cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+        if key in [ord('r'), ord('R')]:
+            engine.antispoof.reset()
+            gesture_engine.reset()
+            consecutive_test_matches = 0
+        elif key in [ord('q'), ord('Q'), 27] or cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
             break
 
     cap.release()

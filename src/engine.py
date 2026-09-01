@@ -567,16 +567,17 @@ class AntiSpoofEngine:
             self.last_metrics["max_screen"] = max_screen
             self.last_metrics["avg_real"] = avg_real
 
-            # Living humans in real rooms have p_screen < 0.05 and p_print < 0.05
-            # If screen energy reaches 0.15 or print reaches 0.15, taint the session permanently
-            if p_screen >= 0.15 or max_screen >= 0.20 or avg_screen >= 0.15:
-                self.session_tainted = True
-                self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
-                return False, avg_real, self.taint_reason
-            elif p_print >= 0.15 or max_print >= 0.20 or avg_print >= 0.15:
-                self.session_tainted = True
-                self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
-                return False, avg_real, self.taint_reason
+            # Multi-frame consensus for Neural Anti-Spoofing:
+            # Requires persistent attack energy across buffer, preventing 1-frame boundary noise false positives
+            if len(self.real_scores_history) >= 3:
+                if avg_screen >= 0.28 or max_screen >= 0.48:
+                    self.session_tainted = True
+                    self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
+                    return False, avg_real, self.taint_reason
+                elif avg_print >= 0.32 or max_print >= 0.52:
+                    self.session_tainted = True
+                    self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
+                    return False, avg_real, self.taint_reason
 
             return True, avg_real, f"Rostro real validado por IA ({avg_real*100:.0f}%)"
         except Exception as e:
