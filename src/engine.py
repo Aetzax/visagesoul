@@ -814,12 +814,12 @@ class GestureEngine:
 
         return None, 0.0, False, False, None
 
-    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.60) -> bool:
+    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.45) -> bool:
         """Returns True if a Thumb_Up gesture is detected."""
         gesture, score, is_geom_thumb, _, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
 
-    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.60) -> bool:
+    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.45) -> bool:
         """Returns True if an Open_Palm (🖐️) gesture is detected."""
         gesture, score, _, is_geom_palm, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
@@ -827,8 +827,8 @@ class GestureEngine:
     def is_gesture_valid(
         self,
         frame_bgr: np.ndarray,
-        mode: str = "thumb_up",
-        min_score: float = 0.60,
+        mode: str = "both",
+        min_score: float = 0.45,
         primary_face: Optional[np.ndarray] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -837,8 +837,8 @@ class GestureEngine:
         Returns (is_valid, detected_gesture_name).
         """
         gesture, score, is_geom_thumb, is_geom_palm, wrist_px = self.detect_gesture(frame_bgr)
-        thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or (is_geom_thumb and score >= 0.40)
-        palm_ok = (gesture == "Open_Palm" and score >= min_score) or (is_geom_palm and score >= 0.40)
+        thumb_ok = (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
+        palm_ok = (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
 
         self.last_metrics["raw_gesture"] = gesture or "None"
         self.last_metrics["raw_score"] = float(score)
@@ -859,8 +859,8 @@ class GestureEngine:
             self.last_metrics["rel_dist"] = rel_dist
             
             # Reject hand gripping or touching the phone/photo frame (must be physically separated from face)
-            if rel_dist < 0.85:
-                reason = f"Mano en borde de pantalla (Dist:{rel_dist:.2f} < 0.85)"
+            if rel_dist < 0.80:
+                reason = f"Mano en borde de pantalla (Dist:{rel_dist:.2f} < 0.80)"
                 self.last_metrics["reason"] = reason
                 return False, reason
 
