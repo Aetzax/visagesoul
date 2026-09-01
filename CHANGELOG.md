@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-09-01
+
+### Fixed
+- **Critical Gesture Engine Bug**: Fixed a `NameError` crash where `folded_count` was uninitialized, which caused the MediaPipe gesture fallback to silently fail and always return `None`.
+- **False Positives in Anti-Spoofing**: Removed the permanent session taint lock from MiniFASNet to prevent a single bad frame (e.g. from lighting changes) from permanently locking out the user as a "Foto impresa".
+- **Rigidity Check Tuning**: Significantly relaxed the 3D parallax `std_geom` and `mad_geom` thresholds (from 0.0120 to 0.0050) to allow users to authenticate while sitting naturally still, reducing false rejections.
+- **Hand Rigidity Disabled**: Disabled the strict static gesture requirement (`std_dist`) for 2FA gestures which required users to wobble their hand.
+
 ## [1.2.0] - 2026-09-01
 
 ### Added

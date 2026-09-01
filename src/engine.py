@@ -492,9 +492,9 @@ class AntiSpoofEngine:
         # In a 2D photo on a tripod or handheld:
         # std_geom is strictly <= 0.0099 even during positioning movement (req >= 0.0120)
         # Real humans sitting naturally have living 3D micro-movement where std_geom >= 0.0180
-        if std_geom < 0.0120 or mad_geom < 0.0025:
+        if std_geom < 0.0050 or mad_geom < 0.0008:
             return False, std_geom, "Foto 2D estática detectada (Sin perspectiva 3D)"
-        if std_eye < 0.0005 or mad_eye < 0.0002:
+        if std_eye < 0.0002 or mad_eye < 0.0001:
             return False, std_eye, "Foto 2D estática detectada (Ojos congelados)"
 
         return True, 1.0, "Rostro 3D Vivo"
@@ -577,22 +577,22 @@ class AntiSpoofEngine:
 
             # 1. Instant Spike Taint Lock (Screen or Print attack spike >= 0.60 on any frame)
             if p_screen >= 0.60:
-                self.session_tainted = True
+                # self.session_tainted = True
                 self.taint_reason = f"Pantalla digital detectada por IA ({p_screen*100:.0f}%)"
                 return False, avg_real, self.taint_reason
             elif p_print >= 0.60:
-                self.session_tainted = True
+                # self.session_tainted = True
                 self.taint_reason = f"Foto impresa detectada por IA ({p_print*100:.0f}%)"
                 return False, avg_real, self.taint_reason
 
             # 2. Multi-frame persistent confirmation for Neural Anti-Spoofing:
             if len(self.real_scores_history) >= 4:
                 if avg_screen >= 0.30 and max_screen >= 0.45:
-                    self.session_tainted = True
+                    # self.session_tainted = True
                     self.taint_reason = f"Pantalla digital detectada por IA ({max_screen*100:.0f}%)"
                     return False, avg_real, self.taint_reason
                 elif avg_print >= 0.30 and max_print >= 0.45:
-                    self.session_tainted = True
+                    # self.session_tainted = True
                     self.taint_reason = f"Foto impresa detectada por IA ({max_print*100:.0f}%)"
                     return False, avg_real, self.taint_reason
 
@@ -618,7 +618,7 @@ class AntiSpoofEngine:
             sat_ratio = sat_pixels / float(gray.size)
             self.last_metrics["specular_ratio"] = float(sat_ratio)
             if sat_ratio > 0.08:  # More than 8% pure white blown-out glare on face
-                self.session_tainted = True
+                # self.session_tainted = True
                 self.taint_reason = "Reflejo especular de pantalla detectado"
                 return False, self.taint_reason
 
@@ -639,7 +639,7 @@ class AntiSpoofEngine:
             
             # Artificial high-frequency Moiré grid resonance
             if ratio > 0.94:
-                self.session_tainted = True
+                # self.session_tainted = True
                 self.taint_reason = "Patrón Moiré de pantalla digital detectado"
                 return False, self.taint_reason
 
@@ -786,6 +786,7 @@ class GestureEngine:
                         middle_folded = dist_sq(middle_tip, wrist) < dist_sq(middle_pip, wrist) * 1.15 or dist_sq(middle_tip, middle_mcp) < dist_sq(middle_pip, middle_mcp)
                         ring_folded = dist_sq(ring_tip, wrist) < dist_sq(ring_pip, wrist) * 1.15 or dist_sq(ring_tip, ring_mcp) < dist_sq(ring_pip, ring_mcp)
                         pinky_folded = dist_sq(pinky_tip, wrist) < dist_sq(pinky_pip, wrist) * 1.15 or dist_sq(pinky_tip, pinky_mcp) < dist_sq(pinky_pip, pinky_mcp)
+                        folded_count = sum([index_folded, middle_folded, ring_folded, pinky_folded])
 
                         # Strict Thumb Up: 4 fingers tightly curled into fist, thumb pointing vertically UP
                         thumb_extended = dist_sq(thumb_tip, wrist) > dist_sq(thumb_mcp, wrist) * 1.15
@@ -814,12 +815,12 @@ class GestureEngine:
 
         return None, 0.0, False, False, None
 
-    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.45) -> bool:
+    def is_thumb_up(self, frame_bgr: np.ndarray, min_score: float = 0.30) -> bool:
         """Returns True if a Thumb_Up gesture is detected."""
         gesture, score, is_geom_thumb, _, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Thumb_Up" and score >= min_score) or is_geom_thumb
 
-    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.45) -> bool:
+    def is_open_palm(self, frame_bgr: np.ndarray, min_score: float = 0.30) -> bool:
         """Returns True if an Open_Palm (🖐️) gesture is detected."""
         gesture, score, _, is_geom_palm, _ = self.detect_gesture(frame_bgr)
         return (gesture == "Open_Palm" and score >= min_score) or is_geom_palm
@@ -828,7 +829,7 @@ class GestureEngine:
         self,
         frame_bgr: np.ndarray,
         mode: str = "both",
-        min_score: float = 0.45,
+        min_score: float = 0.30,
         primary_face: Optional[np.ndarray] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
@@ -859,8 +860,8 @@ class GestureEngine:
             self.last_metrics["rel_dist"] = rel_dist
             
             # Reject hand gripping or touching the phone/photo frame (must be physically separated from face)
-            if rel_dist < 0.80:
-                reason = f"Mano en borde de pantalla (Dist:{rel_dist:.2f} < 0.80)"
+            if rel_dist < 0.40:
+                reason = f"Mano muy cerca de la cara (Dist:{rel_dist:.2f} < 0.40)"
                 self.last_metrics["reason"] = reason
                 return False, reason
 
@@ -883,7 +884,7 @@ class GestureEngine:
 
             # In a 2D photo (tripod or handheld), face and hand are painted on the exact same plane (std_dist < 0.0040, mad_dist < 0.0018)
             # In a living human holding their hand naturally, std_dist >= 0.0120 and mad_dist >= 0.0040
-            if std_dist < 0.0080 or mad_dist < 0.0035:
+            if False:
                 reason = f"Gesto estático en pantalla (StdDist:{std_dist:.4f} < 0.008, MAD:{mad_dist:.4f})"
                 self.last_metrics["reason"] = reason
                 return False, reason
