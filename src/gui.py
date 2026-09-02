@@ -558,7 +558,7 @@ class MainWindow(QMainWindow):
         # Controls
         ctrl_layout = QHBoxLayout()
         self.btn_activate_cam = QPushButton("Activar Cámara")
-        self.btn_activate_cam.clicked.connect(self.start_camera_worker)
+        self.btn_activate_cam.clicked.connect(self.toggle_camera_manual)
         ctrl_layout.addWidget(self.btn_activate_cam)
         
         self.btn_start_enroll = QPushButton(tr("enroll_btn_start"))
@@ -604,6 +604,9 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'list_users'): self.refresh_user_list()
 
     def toggle_enrollment(self):
+        if not self.camera_worker or not self.camera_worker.isRunning():
+            self.toggle_camera_manual()
+        
         if not self.enrolling:
             self.enrolling = True
             self.enrolled_samples = []
@@ -1030,10 +1033,24 @@ class MainWindow(QMainWindow):
     # -------------------------------------------------------------
     def on_tab_changed(self, index: int):
         self.stop_camera_worker()
+        if hasattr(self, 'btn_activate_cam'):
+            self.btn_activate_cam.setText("Activar Cámara")
+            self.video_label.setText(tr("enroll_title"))
         if index == 0:
             self.refresh_dashboard_status()
         elif index == 1:
             if hasattr(self, 'list_users'): self.refresh_user_list()
+
+    def toggle_camera_manual(self):
+        if self.camera_worker and self.camera_worker.isRunning():
+            self.stop_camera_worker()
+            if hasattr(self, 'btn_activate_cam'):
+                self.btn_activate_cam.setText("Activar Cámara")
+                self.video_label.setText(tr("enroll_title"))
+        else:
+            self.start_camera_worker()
+            if hasattr(self, 'btn_activate_cam'):
+                self.btn_activate_cam.setText("Desactivar Cámara")
 
     def start_camera_worker(self):
         if self.camera_worker is None or not self.camera_worker.isRunning():
