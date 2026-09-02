@@ -345,7 +345,7 @@ class MainWindow(QMainWindow):
 
         # Header Banner
         header = QHBoxLayout()
-        title_label = QLabel("✨ VisageSoul")
+        title_label = QLabel("VisageSoul")
         title_label.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #7aa2f7;")
         subtitle = QLabel(tr("app_subtitle"))
@@ -400,7 +400,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(status_group)
 
         # Recomendaciones y Avisos
-        tips_group = QGroupBox("💡 Avisos y Recomendaciones")
+        tips_group = QGroupBox("Avisos y Recomendaciones")
         tips_layout = QVBoxLayout(tips_group)
 
         self.lbl_tip_liveness = QLabel()
@@ -459,17 +459,17 @@ class MainWindow(QMainWindow):
 
         liveness = config.getboolean("security", "liveness_check", True)
         if liveness:
-            self.lbl_tip_liveness.setText("🛡️ <b>Anti-Spoofing Activo:</b> Tu sistema está protegido contra ataques de fotos 2D y pantallas.")
+            self.lbl_tip_liveness.setText("<b>Anti-Spoofing Activo:</b> Tu sistema está protegido contra ataques de fotos 2D y pantallas.")
             self.lbl_tip_liveness.setStyleSheet("color: #9ece6a;")
         else:
-            self.lbl_tip_liveness.setText("⚠️ <b>Anti-Spoofing Apagado:</b> Cualquiera podría entrar mostrando una foto tuya a la cámara.")
+            self.lbl_tip_liveness.setText("<b>Anti-Spoofing Apagado:</b> Cualquiera podría entrar mostrando una foto tuya a la cámara.")
             self.lbl_tip_liveness.setStyleSheet("color: #f7768e;")
             
         if thumbs:
-            self.lbl_tip_gesture.setText("✅ <b>Gestos Activos:</b> Tienes activado el Doble Factor (2FA) biomecánico.")
+            self.lbl_tip_gesture.setText("<b>Gestos Activos:</b> Tienes activado el Doble Factor (2FA) biomecánico.")
             self.lbl_tip_gesture.setStyleSheet("color: #7dcfff;")
         else:
-            self.lbl_tip_gesture.setText("ℹ️ <b>Solo Rostro:</b> El sistema abrirá instantáneamente al ver tu cara (Modo Pasivo).")
+            self.lbl_tip_gesture.setText("<b>Solo Rostro:</b> El sistema abrirá instantáneamente al ver tu cara (Modo Pasivo).")
             self.lbl_tip_gesture.setStyleSheet("color: #e0af68;")
             
         if hasattr(self, "list_users"): self.refresh_user_list()
@@ -482,7 +482,7 @@ class MainWindow(QMainWindow):
             models_info = ", ".join([f"{m.get('name', 'Principal')} ({m.get('sample_count', '?')}m)" for m in u.get('models', [])])
             if not models_info:
                 models_info = f"{u['sample_count']} muestras"
-            item = QListWidgetItem(f"👤 {u['username']}  |  Aspectos: [{models_info}]  |  Fecha: {u['created_at'][:10]}")
+            item = QListWidgetItem(f"{u['username']}  |  Aspectos: [{models_info}]  |  Fecha: {u['created_at'][:10]}")
             item.setData(Qt.ItemDataRole.UserRole, u['username'])
             self.list_users.addItem(item)
 
@@ -527,7 +527,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(self.tab_enroll)
 
         # Video Preview
-        self.video_label = QLabel("📷 Para ver la cámara, actívela o inicie un registro...")
+        self.video_label = QLabel("Para ver la cámara, actívela o inicie un registro...")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.video_label.setWordWrap(True)
         self.video_label.setFixedHeight(360)
@@ -713,14 +713,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(pam_group)
 
         # Unlock Rules & Gestures
-        sec_group = QGroupBox("🛡️ Parámetros de Verificación y Seguridad Biométrica")
+        sec_group = QGroupBox("Parámetros de Verificación y Seguridad Biométrica")
         s_form = QFormLayout(sec_group)
 
         self.chk_liveness = QCheckBox("Detección de Vida Activa (IA Neuronal + 3D + Moiré)")
         self.chk_liveness.setChecked(config.getboolean("security", "liveness_check", True))
         s_form.addRow("Filtros Anti-Spoofing:", self.chk_liveness)
 
-        self.lbl_liveness_danger = QLabel("🚨 PELIGRO: Desactivar los filtros de vida permitirá el acceso con cualquier foto plana.")
+        self.lbl_liveness_danger = QLabel("PELIGRO: Desactivar los filtros de vida permitirá el acceso con cualquier foto plana.")
         self.lbl_liveness_danger.setStyleSheet("color: #f7768e; font-size: 11px; font-weight: bold;")
         self.lbl_liveness_danger.setWordWrap(True)
         self.lbl_liveness_danger.setVisible(not self.chk_liveness.isChecked())
@@ -755,7 +755,7 @@ class MainWindow(QMainWindow):
         self.chk_thumbs_up.setChecked(is_gesture_on)
         s_form.addRow("Doble Factor Gestual (2FA):", self.chk_thumbs_up)
 
-        self.lbl_gesture_warning = QLabel("⚠️ Advertencia: Desactivar el gesto reduce la protección contra ataques de fotos o vídeos en mano.")
+        self.lbl_gesture_warning = QLabel("Advertencia: Desactivar el gesto reduce la protección contra ataques de fotos o vídeos en mano.")
         self.lbl_gesture_warning.setStyleSheet("color: #ff9e64; font-size: 11px; font-style: italic;")
         self.lbl_gesture_warning.setWordWrap(True)
         self.lbl_gesture_warning.setVisible(not is_gesture_on)
@@ -946,7 +946,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(maint_group)
 
         # About & Credits Box
-        about_group = QGroupBox("ℹ️ " + tr("about_group"))
+        about_group = QGroupBox("" + tr("about_group"))
         ab_layout = QVBoxLayout(about_group)
 
         lbl_about_info = QLabel(
@@ -1036,7 +1036,7 @@ class MainWindow(QMainWindow):
         self.stop_camera_worker()
         if hasattr(self, 'btn_activate_cam'):
             self.btn_activate_cam.setText("Activar Cámara")
-            self.video_label.setText("📷 Para ver la cámara, actívela o inicie un registro...")
+            self.video_label.setText("Para ver la cámara, actívela o inicie un registro...")
         if index == 0:
             self.refresh_dashboard_status()
         elif index == 1:
@@ -1047,7 +1047,7 @@ class MainWindow(QMainWindow):
             self.stop_camera_worker()
             if hasattr(self, 'btn_activate_cam'):
                 self.btn_activate_cam.setText("Activar Cámara")
-                self.video_label.setText("📷 Para ver la cámara, actívela o inicie un registro...")
+                self.video_label.setText("Para ver la cámara, actívela o inicie un registro...")
         else:
             self.start_camera_worker()
             if hasattr(self, 'btn_activate_cam'):

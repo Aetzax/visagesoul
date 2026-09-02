@@ -172,7 +172,7 @@ def cmd_test(args):
     """Live camera, recognition and gesture test."""
     username = args.user or getpass.getuser()
     print(f"\n=======================================================")
-    print(f"   👁️  VisageSoul: Probador de Reconocimiento y Gestos")
+    print(f"   VisageSoul: Probador de Reconocimiento y Gestos")
     print(f"   Verificando contra: \033[1;32m{username}\033[0m")
     print(f"=======================================================\n")
 
@@ -249,7 +249,7 @@ def cmd_test(args):
                     consecutive_test_matches = 0
                     box_color = (0, 0, 255)
                     bar_color = (20, 20, 180)
-                    score_text = f"[⛔ DENEGADO / FOTO] {liveness_msg}"
+                    score_text = f"[DENEGADO / FOTO] {liveness_msg}"
                 elif is_match and liveness_ok:
                     if require_gesture:
                         if gesture_valid:
@@ -257,28 +257,28 @@ def cmd_test(args):
                             if consecutive_test_matches >= req_matches:
                                 box_color = (0, 255, 0)
                                 bar_color = (20, 140, 20)
-                                clean_gesture_name = "Pulgar Arriba (👍)" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta (🖐️)" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
-                                score_text = f"[✓ AUTORIZADO] {username} ({pct}%) + {clean_gesture_name}"
+                                clean_gesture_name = "Pulgar Arriba" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
+                                score_text = f"[AUTORIZADO] {username} ({pct}%) + {clean_gesture_name}"
                             else:
                                 box_color = (0, 255, 200)
                                 bar_color = (0, 100, 140)
-                                score_text = f"[⏳ VALIDANDO] Mantén el gesto ({consecutive_test_matches}/{req_matches})..."
+                                score_text = f"[VALIDANDO] Mantén el gesto ({consecutive_test_matches}/{req_matches})..."
                         else:
                             consecutive_test_matches = 0
                             box_color = (0, 165, 255)
                             bar_color = (0, 80, 160)
-                            hint = "Pulgar (👍) o Mano (🖐️)" if gesture_mode == "both" else ("Mano Abierta (🖐️)" if gesture_mode == "open_palm" else "Pulgar Arriba (👍)")
-                            score_text = f"[✋ GESTO REQUERIDO] Muestra {hint}"
+                            hint = "Pulgar o Mano" if gesture_mode == "both" else ("Mano Abierta" if gesture_mode == "open_palm" else "Pulgar Arriba")
+                            score_text = f"[GESTO REQUERIDO] Muestra {hint}"
                     else:
                         consecutive_test_matches += 1
                         if consecutive_test_matches >= req_matches:
                             box_color = (0, 255, 0)
                             bar_color = (20, 140, 20)
-                            score_text = f"[✓ AUTORIZADO] {username} ({pct}% similitud)"
+                            score_text = f"[AUTORIZADO] {username} ({pct}% similitud)"
                         else:
                             box_color = (0, 255, 200)
                             bar_color = (0, 100, 140)
-                            score_text = f"[⏳ VALIDANDO] Verificando estabilidad ({consecutive_test_matches}/{req_matches})..."
+                            score_text = f"[VALIDANDO] Verificando estabilidad ({consecutive_test_matches}/{req_matches})..."
                 else:
                     consecutive_test_matches = 0
                     box_color = (0, 0, 255)
@@ -406,7 +406,7 @@ def cmd_status(args):
     print(f"Módulo PAM: " + ("\033[1;32m[INSTALADO]\033[0m" if mod_installed else "\033[1;31m[NO INSTALADO]\033[0m"))
 
     thumbs = config.getboolean("security", "require_thumbs_up", False)
-    print(f"Modo Gesto Pulgar Arriba (👍): " + ("\033[1;32m[ACTIVADO]\033[0m" if thumbs else "\033[1;30m[DESACTIVADO]\033[0m"))
+    print(f"Modo Gesto Pulgar Arriba: " + ("\033[1;32m[ACTIVADO]\033[0m" if thumbs else "\033[1;30m[DESACTIVADO]\033[0m"))
 
     auto_unl = config.getboolean("security", "auto_unlock", True)
     print(f"Desbloqueo Instantáneo: " + ("\033[1;32m[ACTIVADO]\033[0m" if auto_unl else "\033[1;30m[DESACTIVADO]\033[0m"))
