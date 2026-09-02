@@ -260,6 +260,19 @@ static int is_visagesoul_internal_call(void) {
     return 0;
 }
 
+static void send_pam_error(pam_handle_t *pamh, const char *message) {
+    struct pam_conv *conv;
+    int retval = pam_get_item(pamh, PAM_CONV, (const void **)&conv);
+    if (retval != PAM_SUCCESS || conv == NULL || conv->conv == NULL) return;
+    struct pam_message msg;
+    const struct pam_message *msgp = &msg;
+    struct pam_response *resp = NULL;
+    msg.msg_style = PAM_ERROR_MSG;
+    msg.msg = message;
+    conv->conv(1, &msgp, &resp, conv->appdata_ptr);
+    if (resp) { free(resp->resp); free(resp); }
+}
+
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
     (void)flags;
     const char *username = NULL;
@@ -303,9 +316,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if (is_attempt_limit_exceeded(username, max_attempts, window_seconds)) {
         if (debug) syslog(LOG_NOTICE, "User '%s' exceeded max failed attempts (%d). Forcing password.", username, max_attempts);
         if (notify) {
-            send_pam_info(pamh, "Bloqueo por intentos fallidos. Usa tu contraseña.");
+            send_pam_error(pamh, "Fallo de biometría. Límite superado.");
         }
-        return PAM_AUTHINFO_UNAVAIL;
+        return PAM_IGNORE;
     }
 
     const char *verify_bin = get_verify_binary_path();
@@ -365,16 +378,15 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             return PAM_SUCCESS;
         } else if (exit_code == 3) {
             /* Max failed attempts exceeded -> cleanly fall back to password entry */
-            if (notify) send_pam_info(pamh, "Bloqueo por intentos fallidos. Usa tu contraseña.");
-            return PAM_AUTHINFO_UNAVAIL;
+            if (notify) send_pam_error(pamh, "Fallo de biometría. Límite superado.");
+            return PAM_IGNORE;
         } else if (exit_code == 2) {
             if (debug) syslog(LOG_NOTICE, "Camera unavailable or busy. Falling back.");
             return PAM_IGNORE;
         } else {
             if (debug) syslog(LOG_NOTICE, "Biometric match failed or timed out for '%s'. Falling back to password.", username);
-            /* Clear the stuck PAM message in KDE/SDDM so the user knows they can type the password */
-            if (notify) send_pam_info(pamh, "Error. Intentando de nuevo..."); 
-            return PAM_AUTHINFO_UNAVAIL;
+            if (notify) send_pam_error(pamh, "Error. Intentando de nuevo..."); 
+            return PAM_IGNORE;
         }
     }
 
