@@ -978,7 +978,7 @@ class BlinkEngine:
                         right_blink = category.score
                 
                 # If both eyes are closed more than 40%
-                if left_blink > 0.40 and right_blink > 0.40:
+                if left_blink > 0.30 and right_blink > 0.30:
                     self.has_blinked = True
                     return True
         except Exception:

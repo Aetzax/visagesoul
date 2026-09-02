@@ -130,6 +130,8 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
     try:
         engine = FaceEngine()
         gesture_engine = GestureEngine() if require_gesture else None
+        from src.engine import BlinkEngine
+        blink_engine = BlinkEngine()
     except Exception as e:
         logger.error(f"Failed to initialize FaceEngine: {e}")
         return 2
@@ -164,7 +166,7 @@ def verify_user(username: str, timeout: float = None, threshold: float = None, d
 
         start_time = time.time()
         consecutive_matches = 0
-        REQUIRED_CONSECUTIVE_MATCHES = 7
+        REQUIRED_CONSECUTIVE_MATCHES = 5
         frame_idx = 0
 
         while (time.time() - start_time) < timeout:

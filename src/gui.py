@@ -399,44 +399,6 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(status_group)
 
-        # Enrolled Profiles List
-        users_group = QGroupBox(tr("users_group"))
-        u_layout = QVBoxLayout(users_group)
-
-        self.lbl_users_status = QLabel(tr("users_count") + " ...")
-        u_layout.addWidget(self.lbl_users_status)
-
-        self.list_users = QListWidget()
-        u_layout.addWidget(self.list_users)
-
-        btn_box = QHBoxLayout()
-        self.btn_refresh_users = QPushButton(tr("btn_refresh"))
-        self.btn_refresh_users.clicked.connect(self.refresh_user_list)
-
-        btn_add_aspect = QPushButton(tr("btn_add_aspect"))
-        btn_add_aspect.setObjectName("primaryBtn")
-        btn_add_aspect.clicked.connect(lambda: self.tabs.setCurrentIndex(1))
-
-        self.btn_delete_user = QPushButton(tr("btn_delete_user"))
-        self.btn_delete_user.setObjectName("dangerBtn")
-        self.btn_delete_user.clicked.connect(self.delete_selected_user)
-
-        btn_box.addWidget(self.btn_refresh_users)
-        btn_box.addWidget(btn_add_aspect)
-        btn_box.addWidget(self.btn_delete_user)
-        u_layout.addLayout(btn_box)
-
-        layout.addWidget(users_group)
-
-        # Quick Actions
-        actions_group = QGroupBox(tr("actions_group"))
-        a_layout = QHBoxLayout(actions_group)
-
-        btn_test_live = QPushButton(tr("btn_test_live"))
-        btn_test_live.clicked.connect(self.launch_live_test)
-        a_layout.addWidget(btn_test_live)
-
-        layout.addWidget(actions_group)
         layout.addStretch()
 
         self.refresh_dashboard_status()
@@ -550,16 +512,17 @@ class MainWindow(QMainWindow):
         lbl_aspect.setStyleSheet("font-weight: bold; color: #bb9af7;")
         self.combo_aspect = QComboBox()
         self.combo_aspect.setEditable(True)
-        self.combo_aspect.addItem("Principal (Sin gafas)")
-        self.combo_aspect.addItem("Con Gafas (Glasses)")
-        self.combo_aspect.addItem("Con Barba / Peinado")
-        self.combo_aspect.addItem("Iluminación Diferente")
+        self.combo_aspect.addItem("Principal")
         aspect_layout.addWidget(lbl_aspect)
         aspect_layout.addWidget(self.combo_aspect)
         layout.addLayout(aspect_layout)
 
         # Controls
         ctrl_layout = QHBoxLayout()
+        self.btn_activate_cam = QPushButton("Activar Cámara")
+        self.btn_activate_cam.clicked.connect(self.start_camera_worker)
+        ctrl_layout.addWidget(self.btn_activate_cam)
+        
         self.btn_start_enroll = QPushButton(tr("enroll_btn_start"))
         self.btn_start_enroll.setObjectName("primaryBtn")
         self.btn_start_enroll.setFixedHeight(42)
@@ -567,6 +530,38 @@ class MainWindow(QMainWindow):
         ctrl_layout.addWidget(self.btn_start_enroll)
 
         layout.addLayout(ctrl_layout)
+
+        # Users and Profiles Management
+        users_group = QGroupBox("Perfiles Registrados")
+        u_layout = QVBoxLayout(users_group)
+
+        self.lbl_users_status = QLabel("Usuarios: ...")
+        u_layout.addWidget(self.lbl_users_status)
+
+        self.list_users = QListWidget()
+        u_layout.addWidget(self.list_users)
+
+        btn_box = QHBoxLayout()
+        self.btn_refresh_users = QPushButton(tr("btn_refresh"))
+        self.btn_refresh_users.clicked.connect(self.refresh_user_list)
+
+        self.btn_delete_user = QPushButton(tr("btn_delete_user"))
+        self.btn_delete_user.setObjectName("dangerBtn")
+        self.btn_delete_user.clicked.connect(self.delete_selected_user)
+
+        btn_test_live = QPushButton(tr("btn_test_live"))
+        btn_test_live.clicked.connect(self.launch_live_test)
+
+        btn_box.addWidget(self.btn_refresh_users)
+        btn_box.addWidget(self.btn_delete_user)
+        btn_box.addWidget(btn_test_live)
+        u_layout.addLayout(btn_box)
+
+        layout.addWidget(users_group)
+        
+        # We must refresh the user list initially if we moved it here
+        # We'll rely on on_tab_changed to do it, or just call it:
+        # We can't call it here since self.engine might not be ready, wait.
 
     def toggle_enrollment(self):
         if not self.enrolling:
@@ -981,13 +976,11 @@ class MainWindow(QMainWindow):
     # TAB CHANGED & CAMERA LIFECYCLE
     # -------------------------------------------------------------
     def on_tab_changed(self, index: int):
-        if index == 1:
-            self.start_camera_worker()
-        else:
-            self.stop_camera_worker()
-
+        self.stop_camera_worker()
         if index == 0:
             self.refresh_dashboard_status()
+        elif index == 1:
+            self.refresh_user_list()
 
     def start_camera_worker(self):
         if self.camera_worker is None or not self.camera_worker.isRunning():
