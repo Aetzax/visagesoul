@@ -527,8 +527,9 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(self.tab_enroll)
 
         # Video Preview
-        self.video_label = QLabel(tr("enroll_title"))
+        self.video_label = QLabel("📷 Para ver la cámara, actívela o inicie un registro...")
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.video_label.setWordWrap(True)
         self.video_label.setFixedHeight(360)
         self.video_label.setStyleSheet("background: #0f1017; border: 2px solid #2f354a; border-radius: 8px;")
         layout.addWidget(self.video_label)
@@ -1035,7 +1036,7 @@ class MainWindow(QMainWindow):
         self.stop_camera_worker()
         if hasattr(self, 'btn_activate_cam'):
             self.btn_activate_cam.setText("Activar Cámara")
-            self.video_label.setText(tr("enroll_title"))
+            self.video_label.setText("📷 Para ver la cámara, actívela o inicie un registro...")
         if index == 0:
             self.refresh_dashboard_status()
         elif index == 1:
@@ -1046,7 +1047,7 @@ class MainWindow(QMainWindow):
             self.stop_camera_worker()
             if hasattr(self, 'btn_activate_cam'):
                 self.btn_activate_cam.setText("Activar Cámara")
-                self.video_label.setText(tr("enroll_title"))
+                self.video_label.setText("📷 Para ver la cámara, actívela o inicie un registro...")
         else:
             self.start_camera_worker()
             if hasattr(self, 'btn_activate_cam'):
