@@ -179,6 +179,8 @@ def cmd_test(args):
     try:
         engine = FaceEngine()
         gesture_engine = GestureEngine()
+        from src.engine import BlinkEngine
+        blink_engine = BlinkEngine()
     except Exception as e:
         print(f"\033[1;31mError al inicializar el motor:\033[0m {e}")
         return 1
@@ -206,6 +208,7 @@ def cmd_test(args):
 
     face_history = []
     liveness_check = config.getboolean("security", "liveness_check", True)
+    req_matches = config.getint("security", "consecutive_matches", 5)
     consecutive_test_matches = 0
 
     while True:
@@ -251,7 +254,7 @@ def cmd_test(args):
                     if require_gesture:
                         if gesture_valid:
                             consecutive_test_matches += 1
-                            if consecutive_test_matches >= 5:
+                            if consecutive_test_matches >= req_matches:
                                 box_color = (0, 255, 0)
                                 bar_color = (20, 140, 20)
                                 clean_gesture_name = "Pulgar Arriba (👍)" if "Pulgar" in str(valid_gesture_name) else ("Mano Abierta (🖐️)" if "Mano" in str(valid_gesture_name) else str(valid_gesture_name))
@@ -259,7 +262,7 @@ def cmd_test(args):
                             else:
                                 box_color = (0, 255, 200)
                                 bar_color = (0, 100, 140)
-                                score_text = f"[⏳ VALIDANDO] Mantén el gesto ({consecutive_test_matches}/5)..."
+                                score_text = f"[⏳ VALIDANDO] Mantén el gesto ({consecutive_test_matches}/{req_matches})..."
                         else:
                             consecutive_test_matches = 0
                             box_color = (0, 165, 255)
@@ -268,14 +271,14 @@ def cmd_test(args):
                             score_text = f"[✋ GESTO REQUERIDO] Muestra {hint}"
                     else:
                         consecutive_test_matches += 1
-                        if consecutive_test_matches >= 5:
+                        if consecutive_test_matches >= req_matches:
                             box_color = (0, 255, 0)
                             bar_color = (20, 140, 20)
                             score_text = f"[✓ AUTORIZADO] {username} ({pct}% similitud)"
                         else:
                             box_color = (0, 255, 200)
                             bar_color = (0, 100, 140)
-                            score_text = f"[⏳ VALIDANDO] Verificando estabilidad ({consecutive_test_matches}/5)..."
+                            score_text = f"[⏳ VALIDANDO] Verificando estabilidad ({consecutive_test_matches}/{req_matches})..."
                 else:
                     consecutive_test_matches = 0
                     box_color = (0, 0, 255)
@@ -301,7 +304,7 @@ def cmd_test(args):
 
         cv2.rectangle(display_frame, (0, h - 55), (w, h), (15, 15, 15), -1)
         hud_line1 = f"IA Anti-Spoof: Real {p_real*100:.0f}% | Pantalla {p_screen*100:.0f}% | Rigidez 3D: {rigidity:.5f} (req >= 0.012)"
-        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.001) | Consenso: {consecutive_test_matches}/5 | Gesto: {gesture_name}"
+        hud_line2 = f"Dinamica Ocular: {eye_std:.5f} (req >= 0.001) | Consenso: {consecutive_test_matches}/{req_matches} | Gesto: {gesture_name}"
         cv2.putText(display_frame, hud_line1, (15, h - 32), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
         cv2.putText(display_frame, hud_line2, (15, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 200) if gesture_valid else (180, 180, 180), 1)
 

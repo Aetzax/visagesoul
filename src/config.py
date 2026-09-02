@@ -41,6 +41,8 @@ DEFAULT_CONFIG = {
         "sound_volume": "35",
         "max_attempts": "3",
         "attempts_window": "300",
+        "consecutive_matches": "5",
+        "blink_threshold": "0.30",
     },
     "paths": {
         "models_dir": "/usr/share/visagesoul/models",

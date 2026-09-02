@@ -399,6 +399,29 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(status_group)
 
+        # Recomendaciones y Avisos
+        tips_group = QGroupBox("💡 Avisos y Recomendaciones")
+        tips_layout = QVBoxLayout(tips_group)
+
+        self.lbl_tip_liveness = QLabel()
+        self.lbl_tip_liveness.setWordWrap(True)
+        
+        self.lbl_tip_gesture = QLabel()
+        self.lbl_tip_gesture.setWordWrap(True)
+        
+        self.lbl_tip_general = QLabel(
+            "<b>Recomendación General:</b><br>"
+            "Usa la pestaña <i>Seguridad y PAM</i> para ajustar los fotogramas "
+            "consecutivos o la sensibilidad del parpadeo si te cuesta iniciar sesión."
+        )
+        self.lbl_tip_general.setWordWrap(True)
+        self.lbl_tip_general.setStyleSheet("color: #a9b1d6; font-size: 12px;")
+
+        tips_layout.addWidget(self.lbl_tip_liveness)
+        tips_layout.addWidget(self.lbl_tip_gesture)
+        tips_layout.addWidget(self.lbl_tip_general)
+        layout.addWidget(tips_group)
+
         layout.addStretch()
 
         self.refresh_dashboard_status()
@@ -434,6 +457,21 @@ class MainWindow(QMainWindow):
             self.lbl_welcome_status.setText(f"{tr('welcome_status')} {tr('welcome_standard')}")
             self.lbl_welcome_status.setStyleSheet("color: #7aa2f7;")
 
+        liveness = config.getboolean("security", "liveness_check", True)
+        if liveness:
+            self.lbl_tip_liveness.setText("🛡️ <b>Anti-Spoofing Activo:</b> Tu sistema está protegido contra ataques de fotos 2D y pantallas.")
+            self.lbl_tip_liveness.setStyleSheet("color: #9ece6a;")
+        else:
+            self.lbl_tip_liveness.setText("⚠️ <b>Anti-Spoofing Apagado:</b> Cualquiera podría entrar mostrando una foto tuya a la cámara.")
+            self.lbl_tip_liveness.setStyleSheet("color: #f7768e;")
+            
+        if thumbs:
+            self.lbl_tip_gesture.setText("✅ <b>Gestos Activos:</b> Tienes activado el Doble Factor (2FA) biomecánico.")
+            self.lbl_tip_gesture.setStyleSheet("color: #7dcfff;")
+        else:
+            self.lbl_tip_gesture.setText("ℹ️ <b>Solo Rostro:</b> El sistema abrirá instantáneamente al ver tu cara (Modo Pasivo).")
+            self.lbl_tip_gesture.setStyleSheet("color: #e0af68;")
+            
         if hasattr(self, "list_users"): self.refresh_user_list()
 
     def refresh_user_list(self):
@@ -691,6 +729,17 @@ class MainWindow(QMainWindow):
         self.spin_threshold.setValue(config.getfloat("security", "threshold", 0.70))
         s_form.addRow("Umbral de Similitud Facial:", self.spin_threshold)
 
+        self.spin_matches = QSpinBox()
+        self.spin_matches.setRange(1, 20)
+        self.spin_matches.setValue(config.getint("security", "consecutive_matches", 5))
+        s_form.addRow("Fotogramas Consecutivos (Consenso):", self.spin_matches)
+
+        self.spin_blink = QDoubleSpinBox()
+        self.spin_blink.setRange(0.10, 0.90)
+        self.spin_blink.setSingleStep(0.05)
+        self.spin_blink.setValue(config.getfloat("security", "blink_threshold", 0.30))
+        s_form.addRow("Sensibilidad Parpadeo (Blink):", self.spin_blink)
+
         self.spin_timeout = QDoubleSpinBox()
         self.spin_timeout.setRange(1.0, 15.0)
         self.spin_timeout.setSingleStep(0.5)
@@ -771,6 +820,8 @@ class MainWindow(QMainWindow):
         config.set("security", "liveness_check", "true" if self.chk_liveness.isChecked() else "false")
         config.set("security", "threshold", f"{self.spin_threshold.value():.2f}")
         config.set("security", "timeout", f"{self.spin_timeout.value():.1f}")
+        config.set("security", "consecutive_matches", self.spin_matches.value())
+        config.set("security", "blink_threshold", f"{self.spin_blink.value():.2f}")
         config.set("security", "require_thumbs_up", "true" if self.chk_thumbs_up.isChecked() else "false")
         config.set("security", "require_gesture", "true" if self.chk_thumbs_up.isChecked() else "false")
         config.set("security", "gesture_type", self.combo_gesture_type.currentData() or "both")
