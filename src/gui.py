@@ -434,7 +434,7 @@ class MainWindow(QMainWindow):
             self.lbl_welcome_status.setText(f"{tr('welcome_status')} {tr('welcome_standard')}")
             self.lbl_welcome_status.setStyleSheet("color: #7aa2f7;")
 
-        self.refresh_user_list()
+        if hasattr(self, "list_users"): self.refresh_user_list()
 
     def refresh_user_list(self):
         self.list_users.clear()
@@ -562,6 +562,8 @@ class MainWindow(QMainWindow):
         # We must refresh the user list initially if we moved it here
         # We'll rely on on_tab_changed to do it, or just call it:
         # We can't call it here since self.engine might not be ready, wait.
+
+        if hasattr(self, 'list_users'): self.refresh_user_list()
 
     def toggle_enrollment(self):
         if not self.enrolling:
@@ -980,7 +982,7 @@ class MainWindow(QMainWindow):
         if index == 0:
             self.refresh_dashboard_status()
         elif index == 1:
-            self.refresh_user_list()
+            if hasattr(self, 'list_users'): self.refresh_user_list()
 
     def start_camera_worker(self):
         if self.camera_worker is None or not self.camera_worker.isRunning():
